@@ -1,0 +1,45 @@
+# Конфиг pre-commit: набор git-хуков, которые автоматически прогоняются
+# на `git commit` по изменённым файлам. Сам инструмент ставится отдельно
+# (`uv tool install pre-commit` или запуск через `uvx pre-commit`), а хуки
+# ниже подтягиваются из своих репозиториев и крутятся в изолированных
+# окружениях — им не нужны venv'ы сервисов и корневой pyproject.toml.
+#
+# Установка хука в репозиторий:   uvx pre-commit install
+# Прогон по всем файлам вручную:  uvx pre-commit run --all-files
+# Обновить версии (rev) хуков:    uvx pre-commit autoupdate
+
+# Версию интерпретатора для Python-хуков берём системную;
+# при необходимости можно зафиксировать конкретную (например python3.12).
+default_language_version:
+  python: python3.14
+
+# Файлы/папки, которые хуки не должны трогать (IDE, сгенерённые gRPC-стабы).
+exclude: |
+  (?x)^(
+    \.idea/.*|
+    services/.*/app/grpc_gen/.*
+  )$
+
+repos:
+  # --- Ruff: линтер + форматтер для Python (замена flake8/isort/black) ---
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.18
+    hooks:
+      # линтер; --fix автоматически чинит то, что чинится безопасно
+      - id: ruff
+        args: [--fix]
+      # форматтер (аналог black), запускается после линтера
+      - id: ruff-format
+
+  # --- Базовые проверки гигиены файлов от команды pre-commit ---
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace      # срезает хвостовые пробелы в строках
+      - id: end-of-file-fixer        # гарантирует один перевод строки в конце файла
+      - id: check-yaml               # проверяет, что YAML валиден (docker-compose, ci и т.п.)
+      - id: check-toml               # проверяет валидность TOML (pyproject.toml сервисов)
+      - id: check-added-large-files  # блокирует случайный коммит больших файлов
+      - id: check-merge-conflict     # ловит оставленные маркеры конфликтов <<<<<<<
+      - id: check-case-conflict      # ловит имена, конфликтующие на регистронезависимых ФС
+      - id: detect-private-key       # не даёт закоммитить приватный ключ

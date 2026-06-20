@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+*.egg
+
+# Virtual environments / uv
+.venv/
+venv/
+env/
+.python-version
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Test / coverage / cache
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# gRPC generated stubs
+**/grpc_gen/*_pb2.py
+**/grpc_gen/*_pb2.pyi
+**/grpc_gen/*_pb2_grpc.py
+
+# Scrapy
+.scrapy/
+
+# Docker
+*.pid
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp

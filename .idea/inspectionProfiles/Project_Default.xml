@@ -1,0 +1,31 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="DuplicatedCode" enabled="true" level="WEAK WARNING" enabled_by_default="true">
+      <Languages>
+        <language minSize="59" name="Python" />
+      </Languages>
+    </inspection_tool>
+    <inspection_tool class="Eslint" enabled="true" level="WARNING" enabled_by_default="true" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="false" level="INFORMATION" enabled_by_default="false">
+      <option name="ignoredPackages">
+        <list>
+          <option value="pytest" />
+          <option value="webtest" />
+          <option value="flake8" />
+          <option value="flake8-quotes" />
+          <option value="flake8-comprehensions" />
+          <option value="flake8-eradicate" />
+          <option value="flake8-print" />
+          <option value="flake8-bugbear" />
+          <option value="flake8-colors" />
+          <option value="isort" />
+          <option value="ansible" />
+          <option value="ansible-core" />
+          <option value="scikit-learn" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="TsLint" enabled="true" level="WARNING" enabled_by_default="true" />
+  </profile>
+</component>

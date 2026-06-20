@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Системный план — микросервисный проект</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F1F0EA;
+    --grid:#DAD6C8;
+    --ink:#1E2420;
+    --muted:#6E6A5C;
+    --border:#D8D4C7;
+    --paper:#FAF9F5;
+    --services:#3D6B4F;
+    --services-bg:rgba(61,107,79,.08);
+    --data:#A85A2E;
+    --data-bg:rgba(168,90,46,.08);
+    --link:#34487A;
+    --link-bg:rgba(52,72,122,.08);
+    --infra:#54584C;
+    --infra-bg:rgba(84,88,76,.08);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background-color:var(--bg);
+    background-image:
+      repeating-linear-gradient(0deg, var(--grid) 0, var(--grid) 1px, transparent 1px, transparent 64px),
+      repeating-linear-gradient(90deg, var(--grid) 0, var(--grid) 1px, transparent 1px, transparent 64px);
+    background-attachment:fixed;
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:56px 20px 80px;}
+
+  header.masthead{margin-bottom:48px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:.12em;
+    color:var(--muted);
+    text-transform:uppercase;
+    margin:0 0 10px;
+  }
+  h1{
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:600;
+    font-size:clamp(26px,5vw,38px);
+    margin:0 0 14px;
+    letter-spacing:-.01em;
+  }
+  header.masthead p{
+    margin:0;
+    max-width:56ch;
+    color:var(--muted);
+    font-size:15px;
+  }
+  nav.jump{
+    display:flex;gap:8px;margin-top:24px;flex-wrap:wrap;
+  }
+  nav.jump a{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    text-decoration:none;
+    color:var(--ink);
+    background:var(--paper);
+    border:1px solid var(--border);
+    padding:6px 12px;
+    border-radius:3px;
+  }
+  nav.jump a:hover{border-color:var(--ink);}
+
+  section{margin-top:56px;}
+  .section-head{
+    display:flex;align-items:baseline;justify-content:space-between;
+    border-bottom:1px solid var(--border);
+    padding-bottom:10px;
+    margin-bottom:18px;
+    gap:12px;flex-wrap:wrap;
+  }
+  h2{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:.1em;
+    margin:0;
+    color:var(--muted);
+  }
+  .toggle-all{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    background:none;border:none;color:var(--link);
+    cursor:pointer;padding:0;text-decoration:underline;
+    text-underline-offset:3px;
+  }
+  .toggle-all:hover{color:var(--ink);}
+
+  /* tiles */
+  .tile{
+    background:var(--paper);
+    border:1px solid var(--border);
+    border-radius:6px;
+    margin-bottom:10px;
+    overflow:hidden;
+    position:relative;
+  }
+  .tile.open{border-color:var(--ink);}
+  .tile-head{
+    width:100%;
+    display:flex;align-items:center;gap:16px;
+    background:none;border:none;
+    text-align:left;cursor:pointer;
+    padding:16px 18px;
+    font-family:inherit;color:inherit;
+  }
+  .tile-head:focus-visible{outline:2px solid var(--ink);outline-offset:-2px;}
+
+  .num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:22px;font-weight:600;
+    color:var(--services);
+    min-width:34px;
+    opacity:.55;
+  }
+  .swatch{
+    width:10px;height:10px;border-radius:2px;flex:none;
+  }
+  .tile-titles{flex:1;min-width:0;}
+  .tile-title{
+    font-weight:600;font-size:15.5px;margin:0;
+  }
+  .tile-summary{
+    margin:3px 0 0;color:var(--muted);font-size:13.5px;
+  }
+  .chev{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:16px;color:var(--muted);
+    transition:transform .25s ease;
+    flex:none;
+  }
+  .tile.open .chev{transform:rotate(90deg);}
+
+  .panel-wrap{
+    display:grid;grid-template-rows:0fr;
+    transition:grid-template-rows .32s ease;
+  }
+  .tile.open .panel-wrap{grid-template-rows:1fr;}
+  .panel-inner{overflow:hidden;}
+  .panel-content{
+    padding:0 18px 20px 68px;
+    font-size:14.5px;
+    color:var(--ink);
+    border-top:1px dashed var(--border);
+    margin-top:2px;padding-top:14px;
+  }
+  .panel-content p{margin:0 0 10px;}
+  .panel-content p:last-child{margin-bottom:0;}
+  .panel-content .tag-row{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;}
+  .panel-content .tag{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;color:var(--muted);
+    border:1px solid var(--border);
+    border-radius:3px;padding:3px 8px;
+  }
+
+  /* category accents */
+  .cat-services .num,.cat-services .swatch{background:var(--services);color:var(--services);}
+  .cat-services.open{box-shadow:inset 3px 0 0 var(--services);}
+  .cat-data .swatch{background:var(--data);}
+  .cat-data.open{box-shadow:inset 3px 0 0 var(--data);}
+  .cat-link .swatch{background:var(--link);}
+  .cat-link.open{box-shadow:inset 3px 0 0 var(--link);}
+  .cat-infra .swatch{background:var(--infra);}
+  .cat-infra.open{box-shadow:inset 3px 0 0 var(--infra);}
+  .cat-services.open{box-shadow:inset 3px 0 0 var(--services);}
+
+  .group-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+    display:flex;align-items:center;gap:8px;
+    margin:26px 0 10px;color:var(--muted);
+  }
+  .group-label:first-child{margin-top:0;}
+  .group-label .swatch{width:8px;height:8px;}
+
+  /* architecture diagram */
+  .diagram-hint{font-size:13px;color:var(--muted);margin:0 0 14px;}
+  .diagram-wrap{
+    background:var(--paper);border:1px solid var(--border);
+    border-radius:8px;padding:16px;
+  }
+  .diagram-wrap svg{width:100%;height:auto;display:block;}
+  .diagram-wrap text{font-family:'IBM Plex Sans',sans-serif;}
+  .dt{font-size:14px;font-weight:600;fill:var(--ink);}
+  .ds{font-size:12px;fill:var(--muted);}
+  .dline{stroke:#9C9786;stroke-width:1.2;fill:none;}
+  .diagram-node{cursor:pointer;}
+  .diagram-node rect{stroke-width:1;transition:stroke-width .15s ease;}
+  .diagram-node:hover rect{stroke-width:2;}
+  .diagram-node.active rect{stroke-width:2.5;}
+  .diagram-node:focus-visible{outline:none;}
+  .diagram-node:focus-visible rect{stroke-width:2.5;}
+  .dn-infra rect{fill:var(--infra-bg);stroke:var(--infra);}
+  .dn-services rect{fill:var(--services-bg);stroke:var(--services);}
+  .dn-data rect{fill:var(--data-bg);stroke:var(--data);}
+  .dn-link rect{fill:var(--link-bg);stroke:var(--link);}
+
+  .panel-wrap.open{grid-template-rows:1fr;}
+  .diagram-panel{margin-top:14px;}
+  .diagram-panel .panel-content{
+    padding:16px 18px;border:1px dashed var(--border);
+    border-radius:6px;background:var(--paper);
+  }
+  .dp-eyebrow{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;
+    letter-spacing:.1em;text-transform:uppercase;margin:0 0 6px;
+  }
+  .dp-h{font-size:16px;font-weight:600;margin:0 0 8px;}
+
+  footer{
+    margin-top:64px;padding-top:18px;border-top:1px solid var(--border);
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted);
+  }
+
+  @media (max-width:520px){
+    .panel-content{padding-left:18px;}
+    .num{display:none;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .panel-wrap,.chev{transition:none;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Справочник · собрано из переписки</p>
+    <h1>Системный план: микросервисный проект</h1>
+    <p>Дорожная карта по фазам и стек технологий с описанием роли каждой штуки. Нажми на плашку — раскроется описание.</p>
+    <nav class="jump">
+      <a href="#project">О проекте</a>
+      <a href="#architecture">Архитектура</a>
+      <a href="#protocols">Пути передачи</a>
+      <a href="#roadmap">Дорожная карта</a>
+      <a href="#stack">Технологии</a>
+    </nav>
+  </header>
+
+  <section id="project">
+    <div class="section-head">
+      <h2>О проекте · что это в итоге</h2>
+    </div>
+    <div class="tile cat-services open">
+      <div class="panel-content" style="padding-left:18px;border-top:none;margin-top:0;padding-top:0;">
+        <p><strong>Личная база знаний</strong> — сервис, куда стекаются заметки, ссылки, код-сниппеты и спарсенные статьи из разных источников (веб, бот, парсер), а затем находятся обратно — по тегу, по тексту или по смыслу.</p>
+        <p>Пользователь добавляет запись через веб, мобильный клиент или Telegram-бота. Parser в фоне подтягивает контент по расписанию (RSS, страницы по списку). Всё проходит через Main API, складывается в Postgres, индексируется для поиска и, на дальних фазах, превращается в embeddings для семантического поиска — «найди похожее по смыслу», а не только по точному совпадению слов.</p>
+        <p>Ключевая практическая цель — не сам продукт, а полигон: каждый сервис на роадмапе ниже добавляет повод пощупать конкретную технологию вживую, а не на туториале. Auth — это JWT и database-per-service. Kafka — события между сервисами. gRPC — синхронные внутренние вызовы с типизированным контрактом. Celery — фон внутри одного сервиса. Observability — как выглядит «сломалось» в системе из пяти сервисов, а не в монолите.</p>
+        <div class="tag-row"><span class="tag">заметки</span><span class="tag">теги</span><span class="tag">полнотекстовый поиск</span><span class="tag">семантический поиск</span><span class="tag">telegram-бот</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="architecture">
+    <div class="section-head">
+      <h2>Архитектура · схема зависимостей</h2>
+    </div>
+    <p class="diagram-hint">Нажми на блок схемы — ниже откроется описание.</p>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 680 654" role="img" aria-label="Схема зависимостей сервисов">
+        <defs>
+          <marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="#9C9786" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+
+        <line x1="340" y1="84" x2="340" y2="134" class="dline" marker-end="url(#arrow2)"/>
+        <line x1="340" y1="190" x2="118" y2="240" class="dline" marker-end="url(#arrow2)"/>
+        <line x1="340" y1="190" x2="268" y2="240" class="dline" marker-end="url(#arrow2)"/>
+        <line x1="340" y1="190" x2="418" y2="240" class="dline" marker-end="url(#arrow2)"/>
+        <line x1="340" y1="190" x2="568" y2="240" class="dline" marker-end="url(#arrow2)"/>
+        <line x1="118" y1="296" x2="118" y2="346" class="dline" marker-end="url(#arrow2)"/>
+        <line x1="268" y1="296" x2="268" y2="346" class="dline" marker-end="url(#arrow2)"/>
+        <line x1="418" y1="296" x2="418" y2="346" class="dline" marker-end="url(#arrow2)"/>
+        <line x1="568" y1="296" x2="568" y2="346" class="dline" marker-end="url(#arrow2)"/>
+        <line x1="343" y1="402" x2="190" y2="452" class="dline" marker-end="url(#arrow2)"/>
+        <line x1="343" y1="402" x2="495" y2="452" class="dline" marker-end="url(#arrow2)"/>
+        <line x1="190" y1="508" x2="343" y2="558" class="dline" marker-end="url(#arrow2)"/>
+        <line x1="495" y1="508" x2="343" y2="558" class="dline" marker-end="url(#arrow2)"/>
+
+        <g class="diagram-node dn-infra" data-key="clients" tabindex="0" role="button" aria-label="Клиенты">
+          <rect x="240" y="40" width="200" height="44" rx="8"/>
+          <text class="dt" x="340" y="62" text-anchor="middle" dominant-baseline="central">Клиенты</text>
+        </g>
+
+        <g class="diagram-node dn-infra" data-key="gateway" tabindex="0" role="button" aria-label="API Gateway">
+          <rect x="240" y="134" width="200" height="56" rx="8"/>
+          <text class="dt" x="340" y="152" text-anchor="middle" dominant-baseline="central">API Gateway</text>
+          <text class="ds" x="340" y="170" text-anchor="middle" dominant-baseline="central">Nginx / Traefik</text>
+        </g>
+
+        <g class="diagram-node dn-services" data-key="auth" tabindex="0" role="button" aria-label="Auth Service">
+          <rect x="50" y="240" width="135" height="56" rx="8"/>
+          <text class="dt" x="118" y="258" text-anchor="middle" dominant-baseline="central">Auth Service</text>
+          <text class="ds" x="118" y="276" text-anchor="middle" dominant-baseline="central">JWT, OAuth2</text>
+        </g>
+        <g class="diagram-node dn-services" data-key="mainapi" tabindex="0" role="button" aria-label="Main API">
+          <rect x="200" y="240" width="135" height="56" rx="8"/>
+          <text class="dt" x="268" y="258" text-anchor="middle" dominant-baseline="central">Main API</text>
+          <text class="ds" x="268" y="276" text-anchor="middle" dominant-baseline="central">FastAPI</text>
+        </g>
+        <g class="diagram-node dn-services" data-key="bot" tabindex="0" role="button" aria-label="Bot Service">
+          <rect x="350" y="240" width="135" height="56" rx="8"/>
+          <text class="dt" x="418" y="258" text-anchor="middle" dominant-baseline="central">Bot Service</text>
+          <text class="ds" x="418" y="276" text-anchor="middle" dominant-baseline="central">Aiogram</text>
+        </g>
+        <g class="diagram-node dn-services" data-key="parser" tabindex="0" role="button" aria-label="Parser">
+          <rect x="500" y="240" width="135" height="56" rx="8"/>
+          <text class="dt" x="568" y="258" text-anchor="middle" dominant-baseline="central">Parser</text>
+          <text class="ds" x="568" y="276" text-anchor="middle" dominant-baseline="central">Scrapy</text>
+        </g>
+
+        <g class="diagram-node dn-link" data-key="kafka" tabindex="0" role="button" aria-label="Kafka">
+          <rect x="50" y="346" width="585" height="56" rx="10"/>
+          <text class="dt" x="343" y="364" text-anchor="middle" dominant-baseline="central">Kafka</text>
+          <text class="ds" x="343" y="382" text-anchor="middle" dominant-baseline="central">шина событий между сервисами</text>
+        </g>
+
+        <g class="diagram-node dn-link" data-key="celery" tabindex="0" role="button" aria-label="Celery + Redis">
+          <rect x="50" y="452" width="280" height="56" rx="8"/>
+          <text class="dt" x="190" y="470" text-anchor="middle" dominant-baseline="central">Celery + Redis</text>
+          <text class="ds" x="190" y="488" text-anchor="middle" dominant-baseline="central">фоновые задачи</text>
+        </g>
+        <g class="diagram-node dn-infra" data-key="ml" tabindex="0" role="button" aria-label="ML Service">
+          <rect x="355" y="452" width="280" height="56" rx="8" stroke-dasharray="4 3"/>
+          <text class="dt" x="495" y="470" text-anchor="middle" dominant-baseline="central">ML Service</text>
+          <text class="ds" x="495" y="488" text-anchor="middle" dominant-baseline="central">в планах</text>
+        </g>
+
+        <g class="diagram-node dn-data" data-key="pg" tabindex="0" role="button" aria-label="PostgreSQL">
+          <rect x="50" y="558" width="585" height="56" rx="10"/>
+          <text class="dt" x="343" y="576" text-anchor="middle" dominant-baseline="central">PostgreSQL</text>
+          <text class="ds" x="343" y="594" text-anchor="middle" dominant-baseline="central">своя БД на сервис · SQLAlchemy + Alembic</text>
+        </g>
+      </svg>
+    </div>
+
+    <div id="diagram-panel-wrap" class="panel-wrap diagram-panel">
+      <div class="panel-inner">
+        <div class="panel-content" id="diagram-panel-content"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="protocols">
+    <div class="section-head">
+      <h2>Пути передачи · кто с кем как говорит</h2>
+    </div>
+    <p class="diagram-hint">Три разных пути для трёх разных задач: внешний трафик, внутренние вызовы, события.</p>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 680 416" role="img" aria-label="Схема путей передачи: HTTP, gRPC, Kafka">
+        <defs>
+          <marker id="arrow3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="#9C9786" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+
+        <line x1="340" y1="84" x2="340" y2="130" class="dline" marker-end="url(#arrow3)"/>
+        <text class="ds" x="350" y="107" dominant-baseline="central">HTTP</text>
+
+        <line x1="340" y1="186" x2="340" y2="240" class="dline" marker-end="url(#arrow3)"/>
+        <text class="ds" x="350" y="213" dominant-baseline="central">HTTP</text>
+
+        <line x1="200" y1="268" x2="260" y2="268" class="dline" marker-end="url(#arrow3)"/>
+        <text class="ds" x="230" y="256" text-anchor="middle" dominant-baseline="central">gRPC</text>
+
+        <line x1="420" y1="268" x2="480" y2="268" class="dline" marker-end="url(#arrow3)"/>
+        <text class="ds" x="450" y="256" text-anchor="middle" dominant-baseline="central">gRPC</text>
+
+        <line x1="340" y1="296" x2="340" y2="340" class="dline" marker-end="url(#arrow3)"/>
+        <text class="ds" x="350" y="318" dominant-baseline="central">события</text>
+
+        <path d="M120 340 L120 296" fill="none" stroke="#9C9786" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow3)"/>
+
+        <rect x="240" y="40" width="200" height="44" rx="8" fill="var(--infra-bg)" stroke="var(--infra)"/>
+        <text class="dt" x="340" y="62" text-anchor="middle" dominant-baseline="central">Клиенты</text>
+
+        <rect x="240" y="130" width="200" height="56" rx="8" fill="var(--infra-bg)" stroke="var(--infra)"/>
+        <text class="dt" x="340" y="150" text-anchor="middle" dominant-baseline="central">API Gateway</text>
+        <text class="ds" x="340" y="168" text-anchor="middle" dominant-baseline="central">точка входа</text>
+
+        <rect x="40" y="240" width="160" height="56" rx="8" fill="var(--services-bg)" stroke="var(--services)"/>
+        <text class="dt" x="120" y="260" text-anchor="middle" dominant-baseline="central">Bot Service</text>
+        <text class="ds" x="120" y="278" text-anchor="middle" dominant-baseline="central">Aiogram</text>
+
+        <rect x="260" y="240" width="160" height="56" rx="8" fill="var(--services-bg)" stroke="var(--services)"/>
+        <text class="dt" x="340" y="260" text-anchor="middle" dominant-baseline="central">Main API</text>
+        <text class="ds" x="340" y="278" text-anchor="middle" dominant-baseline="central">ядро, FastAPI</text>
+
+        <rect x="480" y="240" width="160" height="56" rx="8" fill="var(--services-bg)" stroke="var(--services)"/>
+        <text class="dt" x="560" y="260" text-anchor="middle" dominant-baseline="central">Search / ML</text>
+        <text class="ds" x="560" y="278" text-anchor="middle" dominant-baseline="central">поиск, embeddings</text>
+
+        <rect x="40" y="340" width="600" height="56" rx="10" fill="var(--link-bg)" stroke="var(--link)"/>
+        <text class="dt" x="340" y="360" text-anchor="middle" dominant-baseline="central">Kafka</text>
+        <text class="ds" x="340" y="378" text-anchor="middle" dominant-baseline="central">события, асинхронно</text>
+      </svg>
+    </div>
+
+    <p class="group-label" style="margin-top:24px;"><span class="swatch" style="background:var(--infra)"></span>Три пути</p>
+
+    <div class="tile cat-infra">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">HTTP / REST — внешний путь</p>
+          <p class="tile-summary">клиент → Gateway → сервис, запрос-ответ</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Веб, мобильный клиент и часть запросов бота идут через единый Gateway по обычному REST. Здесь живёт Swagger/OpenAPI, здесь проще всего дебажить через curl или Postman — это «человеческий» интерфейс системы, рассчитанный на внешних потребителей, не на скорость внутри кластера.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-services">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">gRPC — внутренний путь</p>
+          <p class="tile-summary">сервис → сервис, типизированный синхронный вызов</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Используется там, где одному сервису нужен немедленный ответ от другого с заранее известной структурой данных: Bot Service дёргает Main API напрямую, Main API запрашивает у Search/ML топ похожих заметок. Контракт описан в <code>.proto</code>-файле, из него генерируется типизированный клиент и сервер на обоих концах — никакого ручного парсинга JSON.</p>
+        <p>Под капотом HTTP/2: можно делать не только unary-вызов (один запрос — один ответ), но и streaming — например, отдать пачку заметок на переиндексацию потоком, а не одним тяжёлым запросом.</p>
+        <div class="tag-row"><span class="tag">protobuf</span><span class="tag">unary</span><span class="tag">streaming</span><span class="tag">grpcurl</span></div>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-link">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Kafka — асинхронный путь</p>
+          <p class="tile-summary">событие публикуется один раз, читает кто угодно</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Когда отправителю не важно, кто и когда прочитает событие и прочитает ли вообще прямо сейчас — это Kafka, а не gRPC. Main API публикует событие, Bot Service читает его асинхронно для уведомлений, Parser — для дозаписи новых данных. Связь по смыслу та же, что и в основной схеме архитектуры выше, просто здесь это один из трёх путей, а не вся картина целиком.</p>
+      </div></div></div>
+    </div>
+
+    <p class="group-label" style="margin-top:26px;"><span class="swatch" style="background:var(--data)"></span>Важные моменты</p>
+
+    <div class="tile cat-data">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Когда какой путь выбирать</p>
+          <p class="tile-summary">не размножать gRPC-вызовы там, где подошло бы событие</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>gRPC — это синхронная связность: вызывающий сервис ждёт ответа и падает вместе с тем, кого вызвал, если не поставить таймаут. Если ответ не нужен немедленно («где-то потом обнови индекс») — это повод для Kafka, а не для ещё одного gRPC-вызова. Правило по умолчанию: нужен ответ прямо сейчас и для логики дальше — gRPC; можно подождать и неважно, кто и сколько раз прочитает — Kafka.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-data">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Контракт и таймауты</p>
+          <p class="tile-summary">.proto версионировать аккуратно, deadline — на каждый вызов</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Номера полей в <code>.proto</code> — это контракт на проводе: новые поля добавлять можно, переиспользовать или удалять старый номер — нельзя, иначе старый и новый клиент начнут читать разные значения под одним именем.</p>
+        <p>На каждый gRPC-вызов нужен deadline. Без него зависший внутренний сервис подвешивает вызывающего, а тот — своего вызывающего, и зависание расползается по цепочке без единого упавшего лога.</p>
+        <p>Ретраи на стороне клиента (gRPC их умеет из коробки) означают, что вызов может прийти дважды — обработчик на стороне Main API должен быть идемпотентен, как и Kafka-консьюмер.</p>
+        <div class="tag-row"><span class="tag">proto versioning</span><span class="tag">deadline</span><span class="tag">идемпотентность</span></div>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-data">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">gRPC не наружу</p>
+          <p class="tile-summary">браузер не говорит на чистом gRPC</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Браузер не умеет в HTTP/2-трейлеры, на которых держится gRPC, поэтому наружу — клиентам — gRPC напрямую не отдаётся. Если когда-нибудь захочется, чтобы веб-клиент дёргал внутренний сервис без посредника-REST, нужен отдельный мост — grpc-web или grpc-gateway, а не «просто открыть порт наружу».</p>
+      </div></div></div>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <div class="section-head">
+      <h2>Дорожная карта · фазы 0–8</h2>
+      <button class="toggle-all" data-scope="roadmap">Развернуть всё</button>
+    </div>
+
+    <div class="tile cat-services" data-num="00">
+      <button class="tile-head">
+        <span class="num">00</span>
+        <span class="tile-titles">
+          <p class="tile-title">Подготовка</p>
+          <p class="tile-summary">репозиторий, окружение, минимальная идея продукта</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Монорепозиторий с папкой на каждый сервис. Общий <code>docker-compose.yml</code>, чтобы поднимать всё разом локально. Линтер и pre-commit — лучше сразу, потом будет лень настраивать.</p>
+        <p>Идея продукта может быть размытой, но нужно зафиксировать минимум: кто пользователи и какие сущности — иначе не от чего оттолкнуться при проектировании Auth и Main API.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-services" data-num="01">
+      <button class="tile-head">
+        <span class="num">01</span>
+        <span class="tile-titles">
+          <p class="tile-title">Скелет: Auth + Main API</p>
+          <p class="tile-summary">первый сквозной рабочий путь, ещё без остальных сервисов</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Auth-service на FastAPI: регистрация, логин, JWT с refresh-токенами, хэширование паролей. Своя БД только у него — database-per-service с первого дня.</p>
+        <p>Main API проверяет токены и реализует основную бизнес-логику. SQLAlchemy + Alembic в обоих сервисах. Цель фазы — не архитектура, а работающая связка из двух сервисов с тестами.</p>
+        <div class="tag-row"><span class="tag">FastAPI</span><span class="tag">SQLAlchemy</span><span class="tag">Alembic</span><span class="tag">PostgreSQL</span></div>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-link" data-num="02">
+      <button class="tile-head">
+        <span class="num">02</span>
+        <span class="tile-titles">
+          <p class="tile-title">Асинхронность и связь между сервисами</p>
+          <p class="tile-summary">Celery для фона, Kafka для событий, gRPC для прямых вызовов</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Redis + Celery в Main API — для отложенных и фоновых задач: письма, тяжёлые вычисления, периодика через Celery beat.</p>
+        <p>Kafka — шина событий между сервисами. Начни с одного события (например <code>user.registered</code>), не пытайся спроектировать все топики заранее.</p>
+        <p>Здесь же — первый <code>.proto</code>-контракт и первый gRPC-вызов между сервисами, пусть даже между Main API и заглушкой будущего Search-сервиса без реальной логики внутри. Цель фазы — пощупать сам механизм: кодогенерацию, deadline, grpcurl — а не сразу делать полноценный поиск. Подробнее о том, когда выбирать gRPC, а когда Kafka — в разделе «Пути передачи».</p>
+        <div class="tag-row"><span class="tag">Redis</span><span class="tag">Celery</span><span class="tag">Kafka</span><span class="tag">gRPC</span></div>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-services" data-num="03">
+      <button class="tile-head">
+        <span class="num">03</span>
+        <span class="tile-titles">
+          <p class="tile-title">Бот</p>
+          <p class="tile-summary">Aiogram-сервис, подписан на события Main API</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Отдельный сервис на Aiogram, общается с Main API по REST или читает события из Kafka для уведомлений.</p>
+        <p>Своя БД нужна только для маппинга <code>telegram_id → internal user_id</code>, если он вообще нужен — иначе можно обойтись без неё.</p>
+        <div class="tag-row"><span class="tag">Aiogram</span></div>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-services" data-num="04">
+      <button class="tile-head">
+        <span class="num">04</span>
+        <span class="tile-titles">
+          <p class="tile-title">Парсинг</p>
+          <p class="tile-summary">Scrapy по расписанию, результат публикуется в Kafka</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Сервис со spider'ами, запускается по cron или Celery beat. Результаты публикует в топик, Main API подписывается и обновляет данные у себя.</p>
+        <div class="tag-row"><span class="tag">Scrapy</span><span class="tag">Kafka</span></div>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-infra" data-num="05">
+      <button class="tile-head">
+        <span class="num">05</span>
+        <span class="tile-titles">
+          <p class="tile-title">Наблюдаемость</p>
+          <p class="tile-summary">логи, метрики, health-checks — до того, как станет больно</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Структурированные логи, health/readiness эндпоинты в каждом сервисе, Prometheus + Grafana для метрик, Loki/ELK для централизованных логов.</p>
+        <p>В микросервисах без этого невозможно понять, где сломалось, когда что-то ломается ночью.</p>
+        <div class="tag-row"><span class="tag">Prometheus</span><span class="tag">Grafana</span><span class="tag">Loki / ELK</span></div>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-infra" data-num="06">
+      <button class="tile-head">
+        <span class="num">06</span>
+        <span class="tile-titles">
+          <p class="tile-title">CI/CD</p>
+          <p class="tile-summary">автоматическая сборка и проверка на каждый PR</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>GitHub Actions: линт и тесты на PR, сборка Docker-образов, пуш в registry.</p>
+        <p>В монорепо — path-filters, чтобы пересобирался только изменённый сервис, а не всё подряд.</p>
+        <div class="tag-row"><span class="tag">GitHub Actions</span><span class="tag">Docker registry</span></div>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-infra" data-num="07">
+      <button class="tile-head">
+        <span class="num">07</span>
+        <span class="tile-titles">
+          <p class="tile-title">Kubernetes</p>
+          <p class="tile-summary">оркестрация в проде, Ingress вместо локального gateway</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Манифесты или Helm-чарты на сервис, ConfigMaps/Secrets, Ingress-контроллер.</p>
+        <p>Kafka и Postgres в кластере — отдельная сложность (операторы вроде Strimzi). На старте часто проще держать их managed или вообще вне кластера.</p>
+        <div class="tag-row"><span class="tag">Kubernetes</span><span class="tag">Helm</span><span class="tag">Ingress</span></div>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-data" data-num="08">
+      <button class="tile-head">
+        <span class="num">08</span>
+        <span class="tile-titles">
+          <p class="tile-title">ML-сервис</p>
+          <p class="tile-summary">отдельный сервис инференса — задел на будущее</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>FastAPI-обёртка вокруг модели, подписана на Kafka или принимает REST-запросы напрямую.</p>
+        <p>В Kubernetes может потребовать отдельный node pool под GPU — это уже не приоритет на старте.</p>
+      </div></div></div>
+    </div>
+  </section>
+
+  <section id="stack">
+    <div class="section-head">
+      <h2>Технологии · что за что отвечает</h2>
+      <button class="toggle-all" data-scope="stack">Развернуть всё</button>
+    </div>
+
+    <p class="group-label"><span class="swatch" style="background:var(--services)"></span>Сервисы</p>
+
+    <div class="tile cat-services">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">FastAPI</p>
+          <p class="tile-summary">веб-фреймворк для Auth, Main API и ML-сервиса</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>REST API, валидация запросов через Pydantic, автодокументация (Swagger/OpenAPI) из коробки. Асинхронный — хорошо ложится на работу с Kafka и Celery.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-services">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">SQLAlchemy</p>
+          <p class="tile-summary">ORM для работы с БД из Python-кода</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Позволяет описывать таблицы и запросы на Python вместо сырого SQL на каждую операцию. У каждого сервиса — свои модели и своя сессия подключения к собственной БД.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-services">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Alembic</p>
+          <p class="tile-summary">миграции схемы БД</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Версионирует изменения схемы базы данных, позволяет накатывать и откатывать миграции. Работает в связке с моделями SQLAlchemy.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-services">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Aiogram</p>
+          <p class="tile-summary">Telegram-бот как отдельный сервис</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Асинхронная библиотека для Telegram-ботов с поддержкой FSM (машины состояний) для многошаговых диалогов.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-services">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Scrapy</p>
+          <p class="tile-summary">сервис парсинга внешних источников</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Фреймворк для пауков: очереди запросов, обход страниц, экспорт данных. Запускается отдельно от основных сервисов, по расписанию.</p>
+      </div></div></div>
+    </div>
+
+    <p class="group-label"><span class="swatch" style="background:var(--data)"></span>Данные</p>
+
+    <div class="tile cat-data">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">PostgreSQL</p>
+          <p class="tile-summary">основное хранилище, своя БД на каждый сервис</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>database-per-service: никто не лезет в чужую схему напрямую, сервисы общаются только через API или события — это даёт независимость при изменении схемы.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-data">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Redis</p>
+          <p class="tile-summary">брокер для Celery плюс кэш</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Хранит очередь задач Celery и результаты их выполнения. Параллельно используется как быстрый кэш для часто запрашиваемых данных.</p>
+      </div></div></div>
+    </div>
+
+    <p class="group-label"><span class="swatch" style="background:var(--link)"></span>Связь и события</p>
+
+    <div class="tile cat-link">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Kafka</p>
+          <p class="tile-summary">асинхронная шина событий между сервисами</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Продюсер пишет событие в топик, не зная, кто его читает. Consumer group у каждого сервиса-подписчика своя — копию события получают все подписчики независимо.</p>
+        <p>Ключ публикации (например <code>user_id</code>) определяет партицию и гарантирует порядок событий для одного пользователя. Доставка at-least-once — обработчики должны быть идемпотентны, событие может прийти дважды.</p>
+        <p>Не путать с Celery: Kafka — общение между сервисами, Celery — фоновые задачи внутри одного сервиса.</p>
+        <div class="tag-row"><span class="tag">aiokafka</span><span class="tag">topic</span><span class="tag">consumer group</span></div>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-link">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Celery</p>
+          <p class="tile-summary">фоновые задачи внутри одного сервиса</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Выносит долгие операции из HTTP-запроса: отправка писем, тяжёлые вычисления, периодические job через Celery beat. Использует Redis как брокер.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-link">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">gRPC</p>
+          <p class="tile-summary">синхронные вызовы между сервисами по типизированному контракту</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Контракт описывается в <code>.proto</code>, из него кодогенерацией получается клиент и сервер на Python для обеих сторон — без ручного парсинга JSON и рассинхрона форматов между сервисами. Работает поверх HTTP/2.</p>
+        <p>Поддерживает не только unary-вызов (один запрос — один ответ), но и streaming в любую сторону — удобно для пакетной передачи данных между сервисами. Не путать с Kafka: gRPC — это синхронный вызов с ожиданием ответа, Kafka — публикация события без знания, кто и когда его прочитает.</p>
+        <div class="tag-row"><span class="tag">protobuf</span><span class="tag">grpcio</span><span class="tag">HTTP/2</span></div>
+      </div></div></div>
+    </div>
+
+    <p class="group-label"><span class="swatch" style="background:var(--infra)"></span>Инфраструктура</p>
+
+    <div class="tile cat-infra">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Docker / Compose</p>
+          <p class="tile-summary">контейнеризация, одинаковое окружение везде</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Каждый сервис — свой контейнер. Compose поднимает весь стек локально одной командой — близко к тому, что будет в проде.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-infra">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Kubernetes</p>
+          <p class="tile-summary">оркестрация в проде</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Деплой, автоматическое масштабирование, self-healing (перезапуск упавших подов). Приходит на смену docker-compose только на финальной фазе.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-infra">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Nginx / Traefik</p>
+          <p class="tile-summary">API Gateway, единая точка входа</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Принимает весь внешний трафик и маршрутизирует его к нужному сервису. Клиент видит один адрес, не зная о внутренней структуре системы.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-infra">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">GitHub Actions</p>
+          <p class="tile-summary">CI/CD</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Линт и тесты на каждый PR, сборка Docker-образов, пуш в registry, деплой при мерже в main.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-infra">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Prometheus / Grafana</p>
+          <p class="tile-summary">метрики и дашборды</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Prometheus собирает метрики с сервисов (нагрузка, латентность, ошибки), Grafana строит по ним дашборды и алерты.</p>
+      </div></div></div>
+    </div>
+
+    <div class="tile cat-infra">
+      <button class="tile-head">
+        <span class="swatch"></span>
+        <span class="tile-titles">
+          <p class="tile-title">Loki / ELK</p>
+          <p class="tile-summary">централизованный сбор логов</p>
+        </span>
+        <span class="chev">›</span>
+      </button>
+      <div class="panel-wrap"><div class="panel-inner"><div class="panel-content">
+        <p>Собирает логи со всех сервисов в одно место с возможностью поиска — без этого в микросервисах придётся вручную ходить по контейнерам.</p>
+      </div></div></div>
+    </div>
+
+  </section>
+
+  <footer>roadmap.html · собрано из обсуждения архитектуры</footer>
+</div>
+
+<script>
+  document.querySelectorAll('.tile-head').forEach(function(btn){
+    btn.setAttribute('aria-expanded','false');
+    btn.addEventListener('click', function(){
+      var tile = btn.closest('.tile');
+      var open = tile.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  });
+
+  document.querySelectorAll('.toggle-all').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var scope = document.getElementById(btn.dataset.scope);
+      var tiles = scope.querySelectorAll('.tile');
+      var anyClosed = Array.from(tiles).some(function(t){ return !t.classList.contains('open'); });
+      tiles.forEach(function(t){
+        t.classList.toggle('open', anyClosed);
+        t.querySelector('.tile-head').setAttribute('aria-expanded', anyClosed ? 'true' : 'false');
+      });
+      btn.textContent = anyClosed ? 'Свернуть всё' : 'Развернуть всё';
+    });
+  });
+
+  var nodeInfo = {
+    clients: {cat:'Вход', color:'var(--infra)', title:'Клиенты', body:'<p>Веб, мобильное приложение и Telegram — точки входа пользователей. Сообщения в боте идут напрямую в Telegram API, остальные запросы — через единый Gateway.</p>'},
+    gateway: {cat:'Инфраструктура', color:'var(--infra)', title:'API Gateway', body:'<p>Единая точка входа для внешнего трафика, маршрутизирует запросы к Auth Service и Main API. Реализуется через Nginx или Traefik; в фазе Kubernetes заменяется на Ingress-контроллер.</p>'},
+    auth: {cat:'Сервис', color:'var(--services)', title:'Auth Service', body:'<p>FastAPI-сервис: регистрация, логин, выдача JWT с refresh-токенами, хэширование паролей. Своя БД — database-per-service с первого дня, никто другой не лезет в эту схему напрямую.</p>'},
+    mainapi: {cat:'Сервис', color:'var(--services)', title:'Main API', body:'<p>Основная бизнес-логика приложения. Проверяет JWT, выданные Auth Service, обрабатывает запросы клиентов, публикует события в Kafka и ставит фоновые задачи в Celery.</p>'},
+    bot: {cat:'Сервис', color:'var(--services)', title:'Bot Service', body:'<p>Сервис на Aiogram, общается с Main API по REST или читает события из Kafka для уведомлений. Своя БД нужна только для маппинга telegram_id → internal user_id, если он вообще требуется.</p>'},
+    parser: {cat:'Сервис', color:'var(--services)', title:'Parser', body:'<p>Scrapy-сервис со spider\u2019ами, запускается по расписанию (cron / Celery beat). Результаты публикует в Kafka, Main API подписывается и обновляет данные у себя.</p>'},
+    kafka: {cat:'Связь', color:'var(--link)', title:'Kafka', body:'<p>Продюсер пишет событие в топик, не зная, кто его читает — это и есть развязка сервисов. Main API публикует, например, <code>user.registered</code>, и любое число сервисов может подписаться без изменений в Main API.</p><p>У каждого сервиса-подписчика своя consumer group — все группы получают копию события независимо. Ключ публикации (например <code>user_id</code>) определяет партицию и гарантирует порядок событий для одного пользователя.</p><p>Доставка at-least-once: событие может прийти дважды, обработчики должны быть идемпотентны. Не путать с Celery — Kafka это общение между сервисами, Celery это фоновые задачи внутри одного сервиса.</p>'},
+    celery: {cat:'Связь', color:'var(--link)', title:'Celery + Redis', body:'<p>Выносит долгие операции из HTTP-запроса: отправка писем, тяжёлые вычисления, периодические job через Celery beat. Redis — брокер задач и кэш.</p>'},
+    ml: {cat:'В планах', color:'var(--infra)', title:'ML Service', body:'<p>Сервис инференса модели — пока не построен. В будущем будет подписан на Kafka (например на <code>item.price_updated</code>) или принимать REST-запросы напрямую. В Kubernetes может потребовать отдельный node pool под GPU.</p>'},
+    pg: {cat:'Данные', color:'var(--data)', title:'PostgreSQL', body:'<p>Хранилище данных, своя БД на каждый сервис. Сервисы не лезут в чужую схему напрямую — общаются только через API или события, это даёт независимость при изменении структуры данных.</p>'}
+  };
+
+  var diagramPanelWrap = document.getElementById('diagram-panel-wrap');
+  var diagramPanelContent = document.getElementById('diagram-panel-content');
+
+  function selectNode(key){
+    var active = diagramPanelWrap.dataset.active;
+    document.querySelectorAll('.diagram-node').forEach(function(n){ n.classList.remove('active'); });
+    if(active === key){
+      diagramPanelWrap.classList.remove('open');
+      diagramPanelWrap.dataset.active = '';
+      return;
+    }
+    var info = nodeInfo[key];
+    document.querySelector('.diagram-node[data-key="'+key+'"]').classList.add('active');
+    diagramPanelContent.innerHTML =
+      '<p class="dp-eyebrow" style="color:'+info.color+'">'+info.cat+'</p>' +
+      '<p class="dp-h">'+info.title+'</p>' + info.body;
+    diagramPanelWrap.classList.add('open');
+    diagramPanelWrap.dataset.active = key;
+  }
+
+  document.querySelectorAll('.diagram-node').forEach(function(node){
+    node.addEventListener('click', function(){ selectNode(node.dataset.key); });
+    node.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); selectNode(node.dataset.key); }
+    });
+  });
+</script>
+</body>
+</html>
