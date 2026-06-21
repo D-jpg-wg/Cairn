@@ -1,24 +1,25 @@
-import os
-from dataclasses import dataclass
-
-from dotenv import load_dotenv
-
-load_dotenv()
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-@dataclass(frozen=True, slots=True)
-class Setting:
-    app_name: str = os.getenv("APP_NAME")
+class Setting(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    db_name: str = os.getenv("DB_NAME")
-    db_user: str = os.getenv("DB_USER")
-    db_password: str = os.getenv("DB_PASSWORD")
-    db_host: str = os.getenv("DB_HOST")
-    db_port: str = os.getenv("DB_PORT")
+    app_name: str
 
-    db_url: str = (
-        f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-    )
+    db_name: str
+    db_user: str
+    db_password: str
+    db_host: str
+    db_port: str
+
+    secret_key: str
+
+    @property
+    def db_url(self) -> str:
+        return (
+            f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
+        )
 
 
-setting = Setting()
+setting = Setting()  # type: ignore[call-arg]  # значения берутся из env/.env в рантайме
