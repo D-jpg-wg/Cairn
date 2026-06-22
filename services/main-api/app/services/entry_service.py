@@ -19,7 +19,9 @@ class EntryService:
     async def create_entry(self, body: EntryCreate, owner_id: UUID) -> Entry:
         pass
 
-    async def update_entry(self, body: EntryUpdate, owner_id: UUID) -> Entry:
+    async def update_entry(
+        self, body: EntryUpdate, owner_id: UUID, entry_id: UUID
+    ) -> Entry:
         pass
 
     async def delete_entry(self, entry_id: UUID, owner_id: UUID) -> Entry:
