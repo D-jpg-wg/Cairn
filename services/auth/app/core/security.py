@@ -8,8 +8,12 @@ from starlette import status
 
 from app.core.config import setting
 
-_ALGORITHM = "HS256"
+_ALGORITHM = "RS256"
 _EXPIRE_DAYS = 7
+
+# Ключи читаем один раз на старте: приватным подписываем, публичным проверяем.
+_PRIVATE_KEY = setting.jwt_private_key
+_PUBLIC_KEY = setting.jwt_public_key
 
 _ph = PasswordHasher()
 
@@ -32,14 +36,14 @@ def create_access_token(user_uuid: str) -> str:
     }
     return jwt.encode(
         payload,
-        setting.secret_key,
+        _PRIVATE_KEY,
         algorithm=_ALGORITHM,
     )
 
 
 def decode_access_token(token: str) -> str:
     try:
-        payload = jwt.decode(token, setting.secret_key, algorithms=[_ALGORITHM])
+        payload = jwt.decode(token, _PUBLIC_KEY, algorithms=[_ALGORITHM])
         return payload["sub"]
     except (jwt.PyJWTError, KeyError):
         raise HTTPException(

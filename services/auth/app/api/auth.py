@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 from app.core.deps import get_current_user
+from app.core.limiter import limiter
 from app.db.db_engine import get_async_session
 from app.models import User
 from app.repositories.user_repository import AuthRepository
@@ -17,12 +18,19 @@ def get_auth_service(session: AsyncSession = Depends(get_async_session)) -> Auth
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-async def register(body: UserCreate, service: AuthService = Depends(get_auth_service)):
+@limiter.limit("5/minute")
+async def register(
+    request: Request,
+    body: UserCreate,
+    service: AuthService = Depends(get_auth_service),
+):
     return await service.register(body)
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     body: LoginRequest,
     service: AuthService = Depends(get_auth_service),
 ):

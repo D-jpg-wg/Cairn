@@ -19,6 +19,10 @@ env/
 .env.*
 !.env.example
 
+# JWT signing keys (private key must never be committed)
+*.pem
+**/keys/
+
 # Test / coverage / cache
 .pytest_cache/
 .coverage

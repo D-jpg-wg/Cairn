@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,7 +14,10 @@ class Setting(BaseSettings):
     db_host: str
     db_port: str
 
-    secret_key: str
+    # Пути к RSA-ключам для подписи JWT (RS256).
+    # Приватный — только у auth-сервиса; публичный раздаётся потребителям токенов.
+    jwt_private_key_path: Path = Path("keys/jwt_private.pem")
+    jwt_public_key_path: Path = Path("keys/jwt_public.pem")
 
     @property
     def db_url(self) -> str:
@@ -20,6 +25,14 @@ class Setting(BaseSettings):
             f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
+
+    @property
+    def jwt_private_key(self) -> str:
+        return self.jwt_private_key_path.read_text()
+
+    @property
+    def jwt_public_key(self) -> str:
+        return self.jwt_public_key_path.read_text()
 
 
 setting = Setting()  # type: ignore[call-arg]  # значения берутся из env/.env в рантайме
