@@ -24,7 +24,7 @@ def get_entry_service(
 async def get_all_entry(
     service: EntryService = Depends(get_entry_service),
     owner_id: UUID = Depends(get_current_user_id),
-) -> Optional[list[Entry]]:
+) -> list[Entry]:
     return await service.get_all_entries(owner_id)
 
 

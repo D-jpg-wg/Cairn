@@ -17,7 +17,7 @@ class EntryRepository:
         )
         return stmt.scalars().first()
 
-    async def get_all_entries(self, owner_id: UUID) -> Optional[list[Entry]]:
+    async def get_all_entries(self, owner_id: UUID) -> list[Entry]:
         stmt = await self.session.execute(
             select(Entry).where(Entry.owner_id == owner_id)
         )

@@ -10,7 +10,7 @@ class EntryService:
     def __init__(self, repo: EntryRepository) -> None:
         self.repo = repo
 
-    async def get_all_entries(self, owner_id: UUID) -> Optional[list[Entry]]:
+    async def get_all_entries(self, owner_id: UUID) -> list[Entry]:
         return await self.repo.get_all_entries(owner_id)
 
     async def get_entry(self, entry_id: UUID, owner_id: UUID) -> Optional[Entry]:
