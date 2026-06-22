@@ -52,7 +52,7 @@ async def create_entry(
     return await service.create_entry(body, owner_id)
 
 
-@router.put("/{entry_id}", response_model=EntryRead, status_code=status.HTTP_200_OK)
+@router.patch("/{entry_id}", response_model=EntryRead, status_code=status.HTTP_200_OK)
 async def update_entry(
     entry_id: UUID,
     body: EntryUpdate,
