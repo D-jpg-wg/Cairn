@@ -1,4 +1,4 @@
-import uuid
+from uuid import UUID
 
 import jwt
 from fastapi import HTTPException
@@ -12,11 +12,11 @@ _ALGORITHM = "RS256"
 _PUBLIC_KEY = setting.jwt_public_key
 
 
-def decode_access_token(token: str) -> uuid.UUID:
+def decode_access_token(token: str) -> UUID:
     """Проверяет подпись JWT публичным ключом и возвращает uuid пользователя (sub)."""
     try:
         payload = jwt.decode(token, _PUBLIC_KEY, algorithms=[_ALGORITHM])
-        return uuid.UUID(payload["sub"])
+        return UUID(payload["sub"])
     except (jwt.PyJWTError, KeyError, ValueError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
