@@ -1,16 +1,17 @@
 from typing import Optional
 from uuid import UUID
-from fastapi import Depends, APIRouter, HTTPException
+from fastapi import Depends, APIRouter, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 from starlette.responses import Response
 
 from app.core.deps import get_current_user_id
-from app.models import Entry
+from app.models import Entry, Tag
 from app.repositories.entry_repository import EntryRepository
-from app.schemas.entry import EntryRead, EntryCreate, EntryUpdate
+from app.schemas.entry import EntryRead, EntryCreate, EntryUpdate, TagRead
 from app.services.entry_service import EntryService
 from app.db.db_engine import get_async_session
+from app.validations.check_exists import check_exists_entry
 
 router = APIRouter()
 
@@ -21,12 +22,24 @@ def get_entry_service(
     return EntryService(EntryRepository(session))
 
 
+@router.get("/tags", response_model=list[TagRead], status_code=status.HTTP_200_OK)
+async def get_all_tags(
+    limit: int = Query(10, alias="limit"),
+    offset: int = Query(0, alias="offset"),
+    service: EntryService = Depends(get_entry_service),
+    owner_id: UUID = Depends(get_current_user_id),
+) -> list[Tag]:
+    tags = await service.get_tags(owner_id)
+    return tags
+
+
 @router.get("/", response_model=list[EntryRead], status_code=status.HTTP_200_OK)
 async def get_all_entry(
+    tag: str | None = None,
     service: EntryService = Depends(get_entry_service),
     owner_id: UUID = Depends(get_current_user_id),
 ) -> list[Entry]:
-    return await service.get_all_entries(owner_id)
+    return await service.get_all_entries(owner_id, tag)
 
 
 @router.get("/{entry_id}", response_model=EntryRead, status_code=status.HTTP_200_OK)
@@ -36,14 +49,11 @@ async def get_entry(
     owner_id: UUID = Depends(get_current_user_id),
 ) -> Optional[Entry]:
     result = await service.get_entry(entry_id=entry_id, owner_id=owner_id)
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found"
-        )
+    result = check_exists_entry(result)
     return result
 
 
-@router.post("/", response_model=EntryCreate, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=EntryRead, status_code=status.HTTP_201_CREATED)
 async def create_entry(
     body: EntryCreate,
     service: EntryService = Depends(get_entry_service),
@@ -59,7 +69,9 @@ async def update_entry(
     service: EntryService = Depends(get_entry_service),
     owner_id: UUID = Depends(get_current_user_id),
 ) -> Entry:
-    return await service.update_entry(body, owner_id, entry_id)
+    result = await service.update_entry(body, owner_id, entry_id)
+    result = check_exists_entry(result)
+    return result
 
 
 @router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -68,5 +80,6 @@ async def delete_entry(
     service: EntryService = Depends(get_entry_service),
     owner_id: UUID = Depends(get_current_user_id),
 ) -> Response:
-    await service.delete_entry(entry_id, owner_id)
+    deleted = await service.delete_entry(entry_id, owner_id)
+    check_exists_entry(deleted)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
