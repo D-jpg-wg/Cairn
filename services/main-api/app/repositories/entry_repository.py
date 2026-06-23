@@ -1,7 +1,7 @@
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -33,7 +33,10 @@ class EntryRepository:
         return stmt.scalars().first()
 
     async def get_all_entries(
-        self, owner_id: UUID, tag: Optional[str] = None
+        self,
+        owner_id: UUID,
+        tag: Optional[str] = None,
+        q: Optional[str] = None,
     ) -> list[Entry]:
         stmt = (
             select(Entry)
@@ -43,6 +46,10 @@ class EntryRepository:
         )
         if tag is not None:
             stmt = stmt.join(Entry.tags).where(Tag.name == tag.lower().strip())
+        if q is not None:
+            stmt = stmt.where(
+                or_(Entry.title.ilike(f"%{q}%"), Entry.content.ilike(f"%{q}%"))
+            )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 

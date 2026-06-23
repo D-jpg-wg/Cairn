@@ -11,9 +11,9 @@ class EntryService:
         self.repo = repo
 
     async def get_all_entries(
-        self, owner_id: UUID, tag: Optional[str] = None
+        self, owner_id: UUID, tag: Optional[str] = None, q: Optional[str] = None
     ) -> list[Entry]:
-        return await self.repo.get_all_entries(owner_id, tag)
+        return await self.repo.get_all_entries(owner_id, tag, q)
 
     async def get_entry(self, entry_id: UUID, owner_id: UUID) -> Optional[Entry]:
         return await self.repo.get_by_id(entry_id, owner_id)

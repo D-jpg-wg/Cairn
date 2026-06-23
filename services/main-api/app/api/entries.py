@@ -1,6 +1,6 @@
 from typing import Optional
 from uuid import UUID
-from fastapi import Depends, APIRouter, Query
+from fastapi import Depends, APIRouter
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 from starlette.responses import Response
@@ -24,8 +24,6 @@ def get_entry_service(
 
 @router.get("/tags", response_model=list[TagRead], status_code=status.HTTP_200_OK)
 async def get_all_tags(
-    limit: int = Query(10, alias="limit"),
-    offset: int = Query(0, alias="offset"),
     service: EntryService = Depends(get_entry_service),
     owner_id: UUID = Depends(get_current_user_id),
 ) -> list[Tag]:
@@ -35,11 +33,12 @@ async def get_all_tags(
 
 @router.get("/", response_model=list[EntryRead], status_code=status.HTTP_200_OK)
 async def get_all_entry(
+    q: str | None = None,
     tag: str | None = None,
     service: EntryService = Depends(get_entry_service),
     owner_id: UUID = Depends(get_current_user_id),
 ) -> list[Entry]:
-    return await service.get_all_entries(owner_id, tag)
+    return await service.get_all_entries(owner_id, tag, q)
 
 
 @router.get("/{entry_id}", response_model=EntryRead, status_code=status.HTTP_200_OK)
