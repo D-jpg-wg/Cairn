@@ -2,6 +2,8 @@ from typing import Optional
 from uuid import UUID
 
 from app.models import Entry, Tag
+from app.models.entry import ENRICHABLE_TYPES
+from app.worker.tasks import enrich_entry
 from app.repositories.entry_repository import EntryRepository
 from app.schemas.entry import EntryCreate, EntryUpdate
 
@@ -23,8 +25,11 @@ class EntryService:
         return await self.repo.get_by_id(entry_id, owner_id)
 
     async def create_entry(self, body: EntryCreate, owner_id: UUID) -> Entry:
-        """Создаёт запись и привязывает её к пользователю."""
-        return await self.repo.create_entry(body, owner_id)
+        """Создаёт запись; для url-типов планирует фоновое обогащение."""
+        entry = await self.repo.create_entry(body, owner_id)
+        if entry.type in ENRICHABLE_TYPES:
+            enrich_entry.delay(str(entry.id))
+        return entry
 
     async def update_entry(
         self, body: EntryUpdate, owner_id: UUID, entry_id: UUID

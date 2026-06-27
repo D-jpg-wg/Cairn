@@ -16,7 +16,9 @@ async def test_create_entry(client, auth, user_a):
     assert r.status_code == 201
     body = r.json()
     assert body["title"] == "Первая"
-    assert body["status"] == "pending"
+    assert (
+        body["status"] == "ready"
+    )  # note без URL — контент уже есть, обогащать нечего
 
 
 async def test_list_returns_created(client, auth, user_a):

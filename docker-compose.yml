@@ -73,6 +73,8 @@ services:
     depends_on:
       main-db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       APP_NAME: cairn-main-api
       DB_HOST: main-db        # имя сервиса в compose-сети, не localhost
@@ -80,6 +82,7 @@ services:
       DB_NAME: ${MAIN_DB_NAME:-cairn_main}
       DB_USER: ${MAIN_DB_USER:-cairn}
       DB_PASSWORD: ${MAIN_DB_PASSWORD:-cairn}
+      CELERY_BROKER_URL: redis://redis:6379/0   # web-процесс ставит задачи в очередь
       # main-api только ПРОВЕРЯЕТ JWT — нужен лишь публичный ключ auth-сервиса.
       JWT_PUBLIC_KEY_PATH: /run/secrets/jwt_public_key
     ports:
@@ -92,6 +95,35 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  main-api-worker:
+    build: ./services/main-api
+    depends_on:
+      main-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_NAME: cairn-main-api
+      DB_HOST: main-db
+      DB_PORT: 5432
+      DB_NAME: ${MAIN_DB_NAME:-cairn_main}
+      DB_USER: ${MAIN_DB_USER:-cairn}
+      DB_PASSWORD: ${MAIN_DB_PASSWORD:-cairn}
+      CELERY_BROKER_URL: redis://redis:6379/0
+    entrypoint: []
+    command: uv run celery -A app.worker.celery_app worker --loglevel=info
     restart: unless-stopped
 
 volumes:

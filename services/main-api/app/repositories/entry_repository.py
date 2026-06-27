@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import Entry, Tag
+from app.models.entry import ENRICHABLE_TYPES, EntryStatus
 from app.schemas.entry import EntryCreate, EntryUpdate
 
 
@@ -67,7 +68,10 @@ class EntryRepository:
         """Создаёт запись владельца, привязывает теги и возвращает её с тегами."""
         data = body.model_dump()
         tags = data.pop("tags", [])
-        entry = Entry(owner_id=owner_id, **data)
+        status = (
+            EntryStatus.PENDING if body.type in ENRICHABLE_TYPES else EntryStatus.READY
+        )
+        entry = Entry(owner_id=owner_id, status=status, **data)
         entry.tags = await self._get_or_create_tags(tags)
         self.session.add(entry)
         await self.session.commit()

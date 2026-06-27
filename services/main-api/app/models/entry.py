@@ -40,6 +40,13 @@ class EntryStatus(str, enum.Enum):
     FAILED = "failed"  # обогащение не удалось
 
 
+# Типы, которым нужен фоновый дотяг контента по URL.
+ENRICHABLE_TYPES = {
+    EntryType.LINK,
+    EntryType.ARTICLE,
+    EntryType.VIDEO,
+}
+
 # values_callable — чтобы в БД хранились значения ("note"), а не имена ("NOTE").
 _entry_type = Enum(
     EntryType, name="entry_type", values_callable=lambda e: [m.value for m in e]
@@ -47,7 +54,6 @@ _entry_type = Enum(
 _entry_status = Enum(
     EntryStatus, name="entry_status", values_callable=lambda e: [m.value for m in e]
 )
-
 
 entry_tags = Table(
     "entry_tags",
