@@ -51,8 +51,9 @@ os.environ.update(
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
-from sqlalchemy import text  # noqa: E402
+from sqlalchemy import create_engine, text  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
 from testcontainers.postgres import PostgresContainer  # noqa: E402
 
 from app.db.base import Base  # noqa: E402
@@ -133,3 +134,23 @@ async def client(engine) -> AsyncClient:
     async with AsyncClient(transport=transport, base_url="http://testserver") as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def task_db(pg_url, monkeypatch):
+    """Подменяет SyncSession задачи на сессию к тестовому Postgres + чистая схема.
+
+    Задача внутри делает `with SyncSession()`, а та смотрит в боевую БД, поэтому
+    подменяем имя SyncSession в модуле задачи на sessionmaker к контейнеру.
+    """
+    sync_engine = create_engine(pg_url.replace("+asyncpg", "+psycopg2"))
+    Base.metadata.create_all(sync_engine)
+    sync_maker = sessionmaker(bind=sync_engine, expire_on_commit=False)
+    with sync_maker() as session:
+        session.execute(
+            text("TRUNCATE entries, tags, entry_tags RESTART IDENTITY CASCADE")
+        )
+        session.commit()
+    monkeypatch.setattr("app.worker.tasks.SyncSession", sync_maker)
+    yield sync_maker
+    sync_engine.dispose()

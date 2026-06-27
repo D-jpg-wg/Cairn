@@ -14,6 +14,8 @@ class Setting(BaseSettings):
     db_host: str
     db_port: str
 
+    celery_broker_url: str = "redis://localhost:6379/0"
+
     # main-api только ПРОВЕРЯЕТ JWT — нужен лишь публичный ключ auth-сервиса.
     jwt_public_key_path: Path = Path("keys/jwt_public.pem")
 
@@ -24,6 +26,10 @@ class Setting(BaseSettings):
             f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
+
+    @property
+    def sync_db_url(self) -> str:
+        return self.db_url.replace("+asyncpg", "+psycopg2")
 
     @property
     def jwt_public_key(self) -> str:
