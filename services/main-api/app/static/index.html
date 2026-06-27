@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cairn</title>
+  <style>
+    :root {
+      --bg: #0f1120;
+      --card: #181b2e;
+      --card-2: #1f2338;
+      --border: #2a2f4a;
+      --text: #e7e9f3;
+      --muted: #8b90ad;
+      --accent: #6c8cff;
+      --accent-2: #8a6cff;
+      --ok: #3ad29f;
+      --warn: #ffb347;
+      --err: #ff6b81;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 15% -10%, #243056 0%, transparent 55%),
+        radial-gradient(1000px 500px at 110% 5%, #3a2a5e 0%, transparent 50%),
+        var(--bg);
+      background-attachment: fixed;
+    }
+    button, input, textarea, select { font-family: inherit; }
+
+    /* ---------- Topbar ---------- */
+    .topbar {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; align-items: center; gap: 16px;
+      padding: 14px 24px;
+      background: rgba(15,17,32,.72);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .brand { display: flex; align-items: center; gap: 11px; }
+    .logo {
+      width: 34px; height: 34px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: grid; place-items: center;
+      font-weight: 800; font-size: 16px; color: #fff;
+      box-shadow: 0 8px 20px rgba(108,140,255,.35);
+    }
+    .brand b { font-size: 17px; letter-spacing: .3px; }
+    .search {
+      flex: 1; max-width: 420px;
+      display: flex; align-items: center; gap: 8px;
+      background: #0f1222; border: 1px solid var(--border);
+      border-radius: 11px; padding: 9px 12px;
+    }
+    .search input { flex: 1; background: none; border: none; outline: none; color: var(--text); font-size: 14px; }
+    .search svg { width: 16px; height: 16px; opacity: .5; flex-shrink: 0; }
+    .spacer { flex: 1; }
+    .user-pill {
+      display: flex; align-items: center; gap: 8px;
+      background: #0f1222; border: 1px solid var(--border);
+      border-radius: 11px; padding: 7px 11px; font-size: 12.5px; color: var(--muted);
+    }
+    .user-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+    /* ---------- Buttons ---------- */
+    .btn {
+      border: 1px solid var(--border); background: #0f1222; color: var(--text);
+      border-radius: 11px; padding: 9px 14px; font-size: 13.5px; font-weight: 600;
+      cursor: pointer; transition: .15s; display: inline-flex; align-items: center; gap: 7px;
+      white-space: nowrap;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn.primary {
+      border: none; color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 8px 20px rgba(108,140,255,.3);
+    }
+    .btn.primary:hover { transform: translateY(-1px); }
+    .btn.danger:hover { border-color: var(--err); color: var(--err); }
+    .btn.icon { padding: 8px; }
+    .btn svg { width: 15px; height: 15px; }
+
+    /* ---------- Layout ---------- */
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 24px; }
+
+    .tagbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+    .chip {
+      padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+      background: #161a2e; border: 1px solid var(--border); color: var(--muted);
+      cursor: pointer; transition: .15s; user-select: none;
+    }
+    .chip:hover { color: var(--text); }
+    .chip.active { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+
+    .entry {
+      background: linear-gradient(180deg, var(--card), var(--card-2));
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 18px; display: flex; flex-direction: column; gap: 12px;
+      transition: .15s;
+    }
+    .entry:hover { border-color: #3a4063; transform: translateY(-2px); }
+    .entry-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .entry-title { font-size: 15.5px; font-weight: 700; line-height: 1.35; margin: 0; word-break: break-word; }
+    .entry-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+    .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+    .badge {
+      font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 7px;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .badge.type { background: rgba(108,140,255,.14); color: #a9bcff; }
+    .badge.st-pending { background: rgba(255,179,71,.14); color: var(--warn); }
+    .badge.st-ready   { background: rgba(58,210,159,.14); color: var(--ok); }
+    .badge.st-failed  { background: rgba(255,107,129,.14); color: var(--err); }
+
+    .entry-body { font-size: 13px; color: var(--muted); line-height: 1.55; word-break: break-word; }
+    .entry-body a { color: var(--accent); text-decoration: none; }
+    .entry-body a:hover { text-decoration: underline; }
+    .entry-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag-mini { font-size: 11px; color: var(--muted); background: #11142400; border: 1px solid var(--border); padding: 2px 8px; border-radius: 999px; }
+    .entry-foot { font-size: 11px; color: var(--muted); margin-top: auto; }
+
+    /* ---------- States ---------- */
+    .center {
+      min-height: 70vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; text-align: center; gap: 14px;
+    }
+    .center .ic { width: 60px; height: 60px; border-radius: 16px; display: grid; place-items: center; font-size: 26px;
+      background: rgba(108,140,255,.12); border: 1px solid rgba(108,140,255,.35); color: var(--accent); }
+    .center h2 { margin: 0; font-size: 19px; }
+    .center p { margin: 0; color: var(--muted); font-size: 14px; max-width: 340px; line-height: 1.5; }
+    .spin { width: 30px; height: 30px; border: 3px solid rgba(108,140,255,.25); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---------- Modal ---------- */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(8,9,18,.7); backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center; padding: 20px; z-index: 40;
+    }
+    .overlay.show { display: flex; }
+    .modal {
+      width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
+      background: linear-gradient(180deg, var(--card), var(--card-2));
+      border: 1px solid var(--border); border-radius: 18px; padding: 24px;
+      box-shadow: 0 40px 80px -20px rgba(0,0,0,.7);
+    }
+    .modal h3 { margin: 0 0 18px; font-size: 18px; }
+    .modal label { display: block; font-size: 12px; color: var(--muted); margin: 0 0 6px 2px; }
+    .modal .field { margin-bottom: 15px; }
+    .modal input, .modal textarea, .modal select {
+      width: 100%; padding: 11px 13px; background: #0f1222; border: 1px solid var(--border);
+      border-radius: 11px; color: var(--text); font-size: 14px; outline: none; transition: .15s;
+    }
+    .modal input:focus, .modal textarea:focus, .modal select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,140,255,.16); }
+    .modal textarea { resize: vertical; min-height: 90px; }
+    .modal .hint { font-size: 11px; color: var(--muted); margin: 6px 2px 0; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 22px; }
+    .modal-actions .btn { flex: 1; justify-content: center; padding: 12px; }
+    .form-err { color: var(--err); font-size: 12.5px; margin-top: 12px; display: none; }
+    .form-err.show { display: block; }
+
+    .hidden { display: none !important; }
+
+    /* ---------- Toast ---------- */
+    .toast {
+      position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: #1b1f33; border: 1px solid var(--border); color: var(--text);
+      padding: 12px 18px; border-radius: 12px; font-size: 13.5px; font-weight: 600;
+      box-shadow: 0 16px 40px rgba(0,0,0,.5); opacity: 0; transition: .25s; z-index: 60; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.err { border-color: rgba(255,107,129,.5); color: var(--err); }
+  </style>
+</head>
+<body>
+  <!-- загрузка -->
+  <div id="loading" class="center">
+    <div class="spin"></div>
+    <p style="color:var(--muted)">Загрузка…</p>
+  </div>
+
+  <!-- гейт: не авторизован -->
+  <div id="gate" class="center hidden">
+    <div class="ic">🔒</div>
+    <h2>Нужен вход</h2>
+    <p>Войдите через сервис авторизации, чтобы открыть свои записи.</p>
+    <a class="btn primary" id="gate-login">Перейти ко входу</a>
+  </div>
+
+  <!-- приложение -->
+  <div id="app" class="hidden">
+    <div class="topbar">
+      <div class="brand"><div class="logo">C</div><b>Cairn</b></div>
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="search" type="text" placeholder="Поиск по записям…" />
+      </div>
+      <div class="spacer"></div>
+      <button class="btn primary" id="new-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+        Новая запись
+      </button>
+      <div class="user-pill"><span class="dot"></span><span id="user-id"></span></div>
+      <button class="btn icon danger" id="logout-btn" title="Выйти">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>
+      </button>
+    </div>
+
+    <div class="wrap">
+      <div class="tagbar" id="tagbar"></div>
+      <div class="grid" id="grid"></div>
+      <div id="empty" class="center hidden" style="min-height:50vh">
+        <div class="ic">📭</div>
+        <h2>Пока пусто</h2>
+        <p>Создайте первую запись — заметку, ссылку, статью, видео или сниппет.</p>
+        <button class="btn primary" id="empty-new">Новая запись</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- модалка создания/редактирования -->
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h3 id="modal-title">Новая запись</h3>
+      <form id="entry-form">
+        <div class="field">
+          <label for="f-title">Заголовок</label>
+          <input id="f-title" type="text" maxlength="255" placeholder="О чём это?" required />
+        </div>
+        <div class="field">
+          <label for="f-type">Тип</label>
+          <select id="f-type">
+            <option value="note">Заметка</option>
+            <option value="link">Ссылка</option>
+            <option value="article">Статья</option>
+            <option value="video">Видео</option>
+            <option value="snippet">Сниппет</option>
+          </select>
+        </div>
+        <div class="field" id="field-url">
+          <label for="f-url">Ссылка (URL)</label>
+          <input id="f-url" type="url" maxlength="2048" placeholder="https://…" />
+        </div>
+        <div class="field" id="field-content">
+          <label for="f-content" id="label-content">Текст</label>
+          <textarea id="f-content" placeholder="Содержимое записи"></textarea>
+        </div>
+        <div class="field">
+          <label for="f-tags">Теги</label>
+          <input id="f-tags" type="text" placeholder="через запятую: python, идеи" />
+        </div>
+        <div class="form-err" id="form-err"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn" id="cancel-btn">Отмена</button>
+          <button type="submit" class="btn primary" id="save-btn">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const AUTH_URL = "http://localhost:8000/";   // сервис авторизации
+    const API = "/api/v1/entries";
+
+    const TYPES = {
+      note:    { label: "Заметка", needs: "content" },
+      link:    { label: "Ссылка",  needs: "url" },
+      article: { label: "Статья",  needs: "url" },
+      video:   { label: "Видео",   needs: "url" },
+      snippet: { label: "Сниппет", needs: "content" },
+    };
+    const STATUS = {
+      pending: "В обработке",
+      ready:   "Готово",
+      failed:  "Ошибка",
+    };
+
+    const $ = (id) => document.getElementById(id);
+    let state = { q: "", tag: null, editing: null };
+
+    // ---------- helpers ----------
+    function show(view) {
+      ["loading", "gate", "app"].forEach((id) => $(id).classList.toggle("hidden", id !== view));
+    }
+    function toast(msg, isErr = false) {
+      const t = $("toast");
+      t.textContent = msg;
+      t.className = "toast show" + (isErr ? " err" : "");
+      setTimeout(() => (t.className = "toast" + (isErr ? " err" : "")), 2400);
+    }
+    function esc(s) {
+      return (s ?? "").replace(/[&<>"']/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+    function fmtDate(iso) {
+      try { return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" }); }
+      catch { return ""; }
+    }
+    async function api(path, opts = {}) {
+      const res = await fetch(API + path, { credentials: "same-origin", ...opts });
+      if (res.status === 401) { show("gate"); throw new Error("unauthorized"); }
+      return res;
+    }
+
+    // ---------- render ----------
+    function entryCard(e) {
+      const t = TYPES[e.type] || { label: e.type };
+      const stLabel = STATUS[e.status] || e.status;
+      const body = e.url
+        ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.url)}</a>`
+        : esc(e.content || "");
+      const tags = (e.tags || []).map((tg) => `<span class="tag-mini">#${esc(tg.name)}</span>`).join("");
+      return `
+        <div class="entry">
+          <div class="entry-head">
+            <h3 class="entry-title">${esc(e.title)}</h3>
+            <div class="entry-actions">
+              <button class="btn icon" data-edit="${e.id}" title="Изменить">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
+              <button class="btn icon danger" data-del="${e.id}" title="Удалить">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="badges">
+            <span class="badge type">${esc(t.label)}</span>
+            <span class="badge st-${esc(e.status)}">${esc(stLabel)}</span>
+          </div>
+          ${body ? `<div class="entry-body">${body}</div>` : ""}
+          ${tags ? `<div class="entry-tags">${tags}</div>` : ""}
+          <div class="entry-foot">${fmtDate(e.created_at)}</div>
+        </div>`;
+    }
+
+    async function loadTags() {
+      try {
+        const res = await api("/tags");
+        const tags = res.ok ? await res.json() : [];
+        const bar = $("tagbar");
+        bar.innerHTML =
+          `<span class="chip ${state.tag === null ? "active" : ""}" data-tag="">Все</span>` +
+          tags.map((t) => `<span class="chip ${state.tag === t.name ? "active" : ""}" data-tag="${esc(t.name)}">#${esc(t.name)}</span>`).join("");
+      } catch {}
+    }
+
+    async function loadEntries() {
+      const params = new URLSearchParams();
+      if (state.q) params.set("q", state.q);
+      if (state.tag) params.set("tag", state.tag);
+      const qs = params.toString();
+      let entries = [];
+      try {
+        const res = await api("/" + (qs ? "?" + qs : ""));
+        entries = res.ok ? await res.json() : [];
+      } catch { return; }
+
+      $("grid").innerHTML = entries.map(entryCard).join("");
+      $("empty").classList.toggle("hidden", entries.length > 0);
+      $("grid").classList.toggle("hidden", entries.length === 0);
+
+      $("grid").querySelectorAll("[data-edit]").forEach((b) =>
+        b.addEventListener("click", () => openEdit(entries.find((e) => e.id === b.dataset.edit))));
+      $("grid").querySelectorAll("[data-del]").forEach((b) =>
+        b.addEventListener("click", () => removeEntry(b.dataset.del)));
+    }
+
+    async function refresh() { await Promise.all([loadTags(), loadEntries()]); }
+
+    // ---------- modal ----------
+    function syncTypeFields() {
+      const needs = TYPES[$("f-type").value].needs;
+      $("field-url").classList.toggle("hidden", needs !== "url");
+      $("field-content").classList.toggle("hidden", needs !== "content");
+      $("label-content").textContent = $("f-type").value === "snippet" ? "Код" : "Текст";
+    }
+    function openCreate() {
+      state.editing = null;
+      $("modal-title").textContent = "Новая запись";
+      $("entry-form").reset();
+      $("f-type").value = "note";
+      syncTypeFields();
+      $("form-err").className = "form-err";
+      $("overlay").classList.add("show");
+      $("f-title").focus();
+    }
+    function openEdit(e) {
+      if (!e) return;
+      state.editing = e.id;
+      $("modal-title").textContent = "Изменить запись";
+      $("f-title").value = e.title;
+      $("f-type").value = e.type;
+      $("f-url").value = e.url || "";
+      $("f-content").value = e.content || "";
+      $("f-tags").value = (e.tags || []).map((t) => t.name).join(", ");
+      syncTypeFields();
+      $("form-err").className = "form-err";
+      $("overlay").classList.add("show");
+    }
+    function closeModal() { $("overlay").classList.remove("show"); }
+
+    function formError(msg) {
+      const el = $("form-err");
+      el.textContent = msg;
+      el.className = "form-err show";
+    }
+
+    async function submitEntry(ev) {
+      ev.preventDefault();
+      const type = $("f-type").value;
+      const needs = TYPES[type].needs;
+      const payload = {
+        title: $("f-title").value.trim(),
+        type,
+        url: $("f-url").value.trim() || null,
+        content: $("f-content").value.trim() || null,
+        tags: $("f-tags").value.split(",").map((s) => s.trim()).filter(Boolean),
+      };
+      if (needs === "url" && !payload.url) return formError("Для этого типа нужна ссылка.");
+      if (needs === "content" && !payload.content) return formError("Для этого типа нужен текст.");
+
+      const save = $("save-btn");
+      save.disabled = true;
+      try {
+        const editing = state.editing;
+        const res = await api(editing ? `/${editing}` : "/", {
+          method: editing ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          const detail = Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail;
+          return formError(detail || "Не удалось сохранить.");
+        }
+        closeModal();
+        toast(editing ? "Запись обновлена" : "Запись создана");
+        await refresh();
+      } catch (e) {
+        if (e.message !== "unauthorized") formError("Ошибка сети.");
+      } finally {
+        save.disabled = false;
+      }
+    }
+
+    async function removeEntry(id) {
+      if (!confirm("Удалить запись?")) return;
+      try {
+        const res = await api(`/${id}`, { method: "DELETE" });
+        if (res.ok) { toast("Запись удалена"); await refresh(); }
+        else toast("Не удалось удалить", true);
+      } catch (e) { if (e.message !== "unauthorized") toast("Ошибка сети", true); }
+    }
+
+    // ---------- events ----------
+    $("gate-login").href = AUTH_URL;
+    $("new-btn").addEventListener("click", openCreate);
+    $("empty-new").addEventListener("click", openCreate);
+    $("cancel-btn").addEventListener("click", closeModal);
+    $("f-type").addEventListener("change", syncTypeFields);
+    $("entry-form").addEventListener("submit", submitEntry);
+    $("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) closeModal(); });
+    $("logout-btn").addEventListener("click", async () => {
+      await fetch("/api/v1/logout", { method: "POST", credentials: "same-origin" });
+      window.location.href = AUTH_URL;
+    });
+
+    $("tagbar").addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      state.tag = chip.dataset.tag || null;
+      loadTags();
+      loadEntries();
+    });
+
+    let searchTimer;
+    $("search").addEventListener("input", (e) => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => { state.q = e.target.value.trim(); loadEntries(); }, 280);
+    });
+
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+
+    // ---------- init ----------
+    (async function init() {
+      try {
+        const res = await fetch("/api/v1/me", { credentials: "same-origin" });
+        if (!res.ok) return show("gate");
+        const me = await res.json();
+        $("user-id").textContent = me.user_id.slice(0, 8);
+        show("app");
+        await refresh();
+      } catch {
+        show("gate");
+      }
+    })();
+  </script>
+</body>
+</html>

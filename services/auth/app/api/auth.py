@@ -80,7 +80,7 @@ async def google_callback(
     email = await google.fetch_email(code)
     token = await service.login_oauth(email)
 
-    resp = RedirectResponse(url="/")
+    resp = RedirectResponse(url=setting.app_url)
     resp.set_cookie(
         "cairn_token",
         token.access_token,

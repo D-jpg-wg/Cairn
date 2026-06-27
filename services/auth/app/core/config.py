@@ -12,6 +12,9 @@ class Setting(BaseSettings):
     # по http://localhost браузер Secure-cookie не сохранит.
     environment: str = "dev"
 
+    # Куда вернуть пользователя после успешного входа (фронт main-app).
+    app_url: str = "http://localhost:8001/"
+
     db_name: str
     db_user: str
     db_password: str

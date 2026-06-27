@@ -1,19 +1,34 @@
 from uuid import UUID
 
-from fastapi import Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import HTTPException, Request
+from starlette import status
 
 from app.core.security import decode_access_token
 
-_bearer = HTTPBearer()
+_COOKIE_NAME = "cairn_token"
 
 
-def get_current_user_id(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
-) -> UUID:
+def extract_token(request: Request) -> str | None:
+    """Токен ищем сначала в cookie (его ставит auth после OAuth-входа),
+    затем в заголовке Authorization: Bearer ..."""
+    token = request.cookies.get(_COOKIE_NAME)
+    if token:
+        return token
+    header = request.headers.get("Authorization", "")
+    if header.startswith("Bearer "):
+        return header.removeprefix("Bearer ").strip()
+    return None
+
+
+def get_current_user_id(request: Request) -> UUID:
     """uuid пользователя из проверенного JWT.
 
     В БД не ходим: пользователи живут в auth-сервисе (database-per-service),
     доверяем подписанному токену. Это и есть owner_id для записей.
     """
-    return decode_access_token(credentials.credentials)
+    token = extract_token(request)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
+    return decode_access_token(token)
