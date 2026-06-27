@@ -18,7 +18,7 @@ class AuthRepository:
         stmt = await self.session.execute(select(User).where(User.uuid == uuid))
         return stmt.scalars().first()
 
-    async def create(self, email: str, hashed_password: str) -> User:
+    async def create(self, email: str, hashed_password: str | None = None) -> User:
         user = User(email=email, hashed_password=hashed_password)
         self.session.add(user)
         await self.session.commit()

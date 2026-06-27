@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.api import auth_router, health_router
 from app.core.config import setting
@@ -24,6 +25,9 @@ def create_app() -> FastAPI:
 
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+
+    # Нужна для хранения OAuth state между /oauth/google и /callback (защита от CSRF).
+    app.add_middleware(SessionMiddleware, secret_key=setting.session_secret)
 
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
     app.include_router(health_router, prefix="/api/v1", tags=["health"])

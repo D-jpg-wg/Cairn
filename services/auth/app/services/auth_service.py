@@ -31,3 +31,11 @@ class AuthService:
                 detail="Invalid email or password",
             )
         return TokenResponse(access_token=create_access_token(str(user.uuid)))
+
+    async def login_oauth(self, email: str) -> TokenResponse:
+        """Логин по уже подтверждённому провайдером email: найти или создать
+        пользователя и выдать наш JWT. Пароль у таких пользователей отсутствует."""
+        user = await self.repo.get_by_email(email)
+        if not user:
+            user = await self.repo.create(email=email)
+        return TokenResponse(access_token=create_access_token(str(user.uuid)))

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cairn · Auth</title>
+  <title>Cairn</title>
   <style>
     :root {
       --bg: #0f1120;
@@ -16,7 +16,7 @@
       --accent-2: #8a6cff;
       --ok: #3ad29f;
       --err: #ff6b81;
-      --radius: 16px;
+      --radius: 18px;
     }
     * { box-sizing: border-box; }
     body {
@@ -33,35 +33,35 @@
       justify-content: center;
       padding: 24px;
     }
-    .shell {
-      width: 100%;
-      max-width: 420px;
-    }
+    .shell { width: 100%; max-width: 400px; }
+
     .brand {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 22px;
-      justify-content: center;
+      gap: 10px;
+      margin-bottom: 26px;
+      text-align: center;
     }
     .logo {
-      width: 38px; height: 38px;
-      border-radius: 11px;
+      width: 52px; height: 52px;
+      border-radius: 15px;
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       display: grid; place-items: center;
-      font-weight: 800; font-size: 18px; color: #fff;
-      box-shadow: 0 8px 24px rgba(108,140,255,.35);
+      font-weight: 800; font-size: 24px; color: #fff;
+      box-shadow: 0 12px 30px rgba(108,140,255,.4);
     }
-    .brand h1 { font-size: 20px; margin: 0; letter-spacing: .3px; }
-    .brand span { color: var(--muted); font-size: 13px; }
+    .brand h1 { font-size: 22px; margin: 0; letter-spacing: .3px; }
+    .brand p { color: var(--muted); font-size: 14px; margin: 2px 0 0; }
 
     .card {
       background: linear-gradient(180deg, var(--card), var(--card-2));
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 26px 24px;
+      padding: 28px 26px;
       box-shadow: 0 30px 60px -20px rgba(0,0,0,.6);
     }
+
     .tabs {
       display: flex;
       gap: 6px;
@@ -87,8 +87,36 @@
       box-shadow: 0 6px 18px rgba(108,140,255,.35);
     }
 
+    /* OAuth */
+    .oauth {
+      width: 100%;
+      display: flex; align-items: center; justify-content: center;
+      gap: 11px;
+      padding: 12px;
+      background: #fff;
+      color: #1f2330;
+      border: none;
+      border-radius: 12px;
+      font-size: 14.5px; font-weight: 600;
+      cursor: pointer;
+      transition: .15s;
+    }
+    .oauth:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0,0,0,.35); }
+    .oauth:active { transform: translateY(0); }
+    .oauth svg { width: 18px; height: 18px; }
+
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      color: var(--muted); font-size: 12px;
+      margin: 20px 0;
+    }
+    .divider::before, .divider::after {
+      content: ""; flex: 1; height: 1px; background: var(--border);
+    }
+
     label { display: block; font-size: 12px; color: var(--muted); margin: 0 0 6px 2px; }
     .field { margin-bottom: 16px; }
+    .input-wrap { position: relative; }
     input {
       width: 100%;
       padding: 12px 14px;
@@ -101,6 +129,12 @@
       transition: .18s;
     }
     input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,140,255,.18); }
+    .toggle-pw {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; color: var(--muted);
+      font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 6px;
+    }
+    .toggle-pw:hover { color: var(--text); }
 
     button.primary {
       width: 100%;
@@ -113,64 +147,49 @@
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       box-shadow: 0 10px 24px rgba(108,140,255,.35);
       transition: .15s;
+      display: flex; align-items: center; justify-content: center; gap: 9px;
     }
     button.primary:hover { transform: translateY(-1px); }
     button.primary:active { transform: translateY(0); opacity: .9; }
-    button.primary:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+    button.primary:disabled { opacity: .65; cursor: not-allowed; transform: none; }
 
-    .out {
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.45);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    button.primary.loading .spinner { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .msg {
       margin-top: 18px;
+      padding: 12px 14px;
       border-radius: 12px;
-      border: 1px solid var(--border);
-      background: #0e1120;
-      font-size: 13px;
-      overflow: hidden;
+      font-size: 13.5px;
+      line-height: 1.45;
       display: none;
+      align-items: flex-start;
+      gap: 9px;
     }
-    .out.show { display: block; }
-    .out .head {
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 14px;
-      font-weight: 600;
-      border-bottom: 1px solid var(--border);
-    }
-    .out.ok .head { color: var(--ok); }
-    .out.err .head { color: var(--err); }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-    .out pre {
-      margin: 0; padding: 12px 14px;
-      white-space: pre-wrap; word-break: break-all;
-      color: var(--muted); font-size: 12px;
-      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-    }
+    .msg.show { display: flex; }
+    .msg.ok  { background: rgba(58,210,159,.12); border: 1px solid rgba(58,210,159,.4); color: var(--ok); }
+    .msg.err { background: rgba(255,107,129,.1); border: 1px solid rgba(255,107,129,.4); color: var(--err); }
+    .msg .ic { flex-shrink: 0; font-weight: 800; }
 
-    .session {
-      margin-top: 18px; padding-top: 18px;
-      border-top: 1px dashed var(--border);
-      display: none;
-    }
-    .session.show { display: block; }
-    .session .row { display: flex; gap: 10px; }
-    .ghost {
-      flex: 1; padding: 11px;
-      background: #0f1222; color: var(--text);
-      border: 1px solid var(--border); border-radius: 11px;
-      font-size: 13px; font-weight: 600; cursor: pointer; transition: .15s;
-    }
-    .ghost:hover { border-color: var(--accent); }
-    .ghost.danger:hover { border-color: var(--err); color: var(--err); }
-    .token-hint { font-size: 11px; color: var(--muted); margin: 10px 2px 0; }
-    .footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 18px; }
+    .legal { text-align: center; color: var(--muted); font-size: 11.5px; margin-top: 18px; line-height: 1.5; }
+    .legal a { color: var(--accent); text-decoration: none; }
+    .legal a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <div class="shell">
     <div class="brand">
       <div class="logo">C</div>
-      <div>
-        <h1>Cairn Auth</h1>
-        <span>сервис авторизации</span>
-      </div>
+      <h1>Cairn</h1>
+      <p>Войдите, чтобы продолжить</p>
     </div>
 
     <div class="card">
@@ -179,6 +198,18 @@
         <div class="tab" data-tab="register">Регистрация</div>
       </div>
 
+      <button class="oauth" id="google-btn" type="button">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.1 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/>
+          <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.1 29.5 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+          <path fill="#4CAF50" d="M24 44c5.4 0 10.3-2.1 14-5.5l-6.5-5.3C29.6 34.7 26.9 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.6 39.6 16.2 44 24 44z"/>
+          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.4l6.5 5.3C40.9 35.6 44 30.4 44 24c0-1.3-.1-2.3-.4-3.5z"/>
+        </svg>
+        <span>Продолжить с Google</span>
+      </button>
+
+      <div class="divider" id="divider">или через почту</div>
+
       <form id="form" autocomplete="off">
         <div class="field">
           <label for="email">Email</label>
@@ -186,26 +217,27 @@
         </div>
         <div class="field">
           <label for="password">Пароль</label>
-          <input id="password" type="password" placeholder="••••••••" required minlength="1" />
+          <div class="input-wrap">
+            <input id="password" type="password" placeholder="••••••••" required minlength="1" />
+            <button class="toggle-pw" type="button" id="toggle-pw">Показать</button>
+          </div>
         </div>
-        <button class="primary" id="submit" type="submit">Войти</button>
+        <button class="primary" id="submit" type="submit">
+          <span class="spinner"></span>
+          <span id="submit-label">Войти</span>
+        </button>
       </form>
 
-      <div class="out" id="out">
-        <div class="head"><span class="dot"></span><span id="out-title"></span></div>
-        <pre id="out-body"></pre>
-      </div>
-
-      <div class="session" id="session">
-        <div class="row">
-          <button class="ghost" id="me-btn">Запросить /me</button>
-          <button class="ghost danger" id="logout-btn">Выйти</button>
-        </div>
-        <div class="token-hint" id="token-hint"></div>
+      <div class="msg" id="msg">
+        <span class="ic" id="msg-ic"></span>
+        <span id="msg-text"></span>
       </div>
     </div>
 
-    <div class="footer">Cairn · /api/v1/auth</div>
+    <div class="legal">
+      Продолжая, вы соглашаетесь с <a href="#">условиями использования</a><br/>
+      и <a href="#">политикой конфиденциальности</a>.
+    </div>
   </div>
 
   <script>
@@ -214,54 +246,60 @@
 
     const $ = (id) => document.getElementById(id);
     const form = $("form");
-    const out = $("out");
-    const session = $("session");
+    const msg = $("msg");
+    const submitBtn = $("submit");
 
     // --- переключение вкладок ---
     document.querySelectorAll(".tab").forEach((tab) => {
       tab.addEventListener("click", () => {
+        if (tab.dataset.tab === mode) return;
         document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
         tab.classList.add("active");
         mode = tab.dataset.tab;
-        $("submit").textContent = mode === "login" ? "Войти" : "Создать аккаунт";
-        hideOut();
+        $("submit-label").textContent = mode === "login" ? "Войти" : "Создать аккаунт";
+        $("divider").textContent = mode === "login" ? "или через почту" : "или зарегистрируйтесь через почту";
+        hideMsg();
       });
     });
 
-    // --- вывод результата ---
-    function showOut(ok, title, body) {
-      out.className = "out show " + (ok ? "ok" : "err");
-      $("out-title").textContent = title;
-      $("out-body").textContent =
-        typeof body === "string" ? body : JSON.stringify(body, null, 2);
-    }
-    function hideOut() { out.className = "out"; }
+    // --- показать/скрыть пароль ---
+    $("toggle-pw").addEventListener("click", () => {
+      const pw = $("password");
+      const show = pw.type === "password";
+      pw.type = show ? "text" : "password";
+      $("toggle-pw").textContent = show ? "Скрыть" : "Показать";
+    });
 
-    // --- хранение токена ---
-    function setToken(t) {
-      if (t) localStorage.setItem("cairn_token", t);
-      else localStorage.removeItem("cairn_token");
-      renderSession();
+    // --- сообщения для пользователя (без технических деталей) ---
+    function showMsg(ok, text) {
+      msg.className = "msg show " + (ok ? "ok" : "err");
+      $("msg-ic").textContent = ok ? "✓" : "!";
+      $("msg-text").textContent = text;
     }
-    function getToken() { return localStorage.getItem("cairn_token"); }
+    function hideMsg() { msg.className = "msg"; }
 
-    function renderSession() {
-      const t = getToken();
-      if (t) {
-        session.classList.add("show");
-        $("token-hint").textContent = "Токен сохранён: " + t.slice(0, 24) + "…";
-      } else {
-        session.classList.remove("show");
-      }
+    function friendlyError(status) {
+      if (status === 401 || status === 400) return "Неверный email или пароль.";
+      if (status === 409) return "Аккаунт с такой почтой уже существует.";
+      if (status === 422) return "Проверьте правильность email и пароля.";
+      if (status === 429) return "Слишком много попыток. Попробуйте чуть позже.";
+      return "Что-то пошло не так. Попробуйте ещё раз.";
     }
+
+    // --- вход через Google (OAuth 2.0) ---
+    $("google-btn").addEventListener("click", () => {
+      window.location.href = `${API}/oauth/google`;
+    });
 
     // --- register / login ---
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      hideMsg();
       const email = $("email").value.trim();
       const password = $("password").value;
-      const btn = $("submit");
-      btn.disabled = true;
+
+      submitBtn.disabled = true;
+      submitBtn.classList.add("loading");
 
       try {
         const res = await fetch(`${API}/${mode === "login" ? "login" : "register"}`, {
@@ -272,46 +310,27 @@
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          showOut(false, `Ошибка ${res.status}`, data.detail ?? data);
+          showMsg(false, friendlyError(res.status));
           return;
         }
 
         if (mode === "login") {
-          setToken(data.access_token);
-          showOut(true, "Вход выполнен", data);
+          if (data.access_token) localStorage.setItem("cairn_token", data.access_token);
+          showMsg(true, "С возвращением! Вход выполнен.");
+          // здесь можно перенаправить пользователя в приложение:
+          // window.location.href = "/";
         } else {
-          showOut(true, "Аккаунт создан", data);
+          showMsg(true, "Аккаунт создан. Теперь войдите.");
+          document.querySelector('.tab[data-tab="login"]').click();
+          $("email").value = email;
         }
-      } catch (err) {
-        showOut(false, "Сеть недоступна", String(err));
+      } catch {
+        showMsg(false, "Нет соединения. Проверьте интернет и попробуйте снова.");
       } finally {
-        btn.disabled = false;
+        submitBtn.disabled = false;
+        submitBtn.classList.remove("loading");
       }
     });
-
-    // --- /me ---
-    $("me-btn").addEventListener("click", async () => {
-      const t = getToken();
-      if (!t) return showOut(false, "Нет токена", "Сначала войдите.");
-      try {
-        const res = await fetch(`${API}/me`, {
-          headers: { Authorization: `Bearer ${t}` },
-        });
-        const data = await res.json().catch(() => ({}));
-        showOut(res.ok, res.ok ? "Текущий пользователь" : `Ошибка ${res.status}`,
-                res.ok ? data : (data.detail ?? data));
-      } catch (err) {
-        showOut(false, "Сеть недоступна", String(err));
-      }
-    });
-
-    // --- logout ---
-    $("logout-btn").addEventListener("click", () => {
-      setToken(null);
-      hideOut();
-    });
-
-    renderSession();
   </script>
 </body>
 </html>

@@ -8,6 +8,10 @@ class Setting(BaseSettings):
 
     app_name: str
 
+    # Окружение: "dev" | "prod". Влияет на флаг Secure у cookie:
+    # по http://localhost браузер Secure-cookie не сохранит.
+    environment: str = "dev"
+
     db_name: str
     db_user: str
     db_password: str
@@ -18,6 +22,19 @@ class Setting(BaseSettings):
     # Приватный — только у auth-сервиса; публичный раздаётся потребителям токенов.
     jwt_private_key_path: Path = Path("keys/jwt_private.pem")
     jwt_public_key_path: Path = Path("keys/jwt_public.pem")
+
+    # OAuth 2.0
+    google_client_id: str
+    google_client_secret: str
+    google_redirect_url: str
+
+    # Секрет для подписи cookie-сессии (хранит OAuth state).
+    session_secret: str
+
+    @property
+    def cookie_secure(self) -> bool:
+        """Secure-cookie только в проде (по http://localhost она не сохранится)."""
+        return self.environment == "prod"
 
     @property
     def db_url(self) -> str:
