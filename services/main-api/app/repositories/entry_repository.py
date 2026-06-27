@@ -39,18 +39,23 @@ class EntryRepository:
     async def get_all_entries(
         self,
         owner_id: UUID,
-        tag: Optional[str] = None,
+        tag: Optional[list[str]] = None,
         q: Optional[str] = None,
     ) -> list[Entry]:
-        """Записи владельца (новые сверху) с фильтром по тегу и поиском в title/content."""
+        """Записи владельца (новые сверху). tag фильтрует по ЛЮБОМУ из тегов (OR),
+        q ищет подстроку в title/content."""
         stmt = (
             select(Entry)
             .where(Entry.owner_id == owner_id)
             .options(selectinload(Entry.tags))
             .order_by(Entry.created_at.desc())
         )
-        if tag is not None:
-            stmt = stmt.join(Entry.tags).where(Tag.name == tag.lower().strip())
+        if tag:
+            names = [t.lower().strip() for t in tag if t.strip()]
+            if names:
+                # Запись попадает в выборку, если у неё есть хотя бы один из тегов.
+                # distinct — чтобы join не задвоил запись с несколькими совпадениями.
+                stmt = stmt.join(Entry.tags).where(Tag.name.in_(names)).distinct()
         if q is not None:
             stmt = stmt.where(
                 or_(Entry.title.ilike(f"%{q}%"), Entry.content.ilike(f"%{q}%"))

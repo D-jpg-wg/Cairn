@@ -13,7 +13,7 @@ class EntryService:
         self.repo = repo
 
     async def get_all_entries(
-        self, owner_id: UUID, tag: Optional[str] = None, q: Optional[str] = None
+        self, owner_id: UUID, tag: Optional[list[str]] = None, q: Optional[str] = None
     ) -> list[Entry]:
         """Записи пользователя с опциональным фильтром по тегу и поиском по тексту."""
         return await self.repo.get_all_entries(owner_id, tag, q)

@@ -182,9 +182,19 @@
     .legal { text-align: center; color: var(--muted); font-size: 11.5px; margin-top: 18px; line-height: 1.5; }
     .legal a { color: var(--accent); text-decoration: none; }
     .legal a:hover { text-decoration: underline; }
+
+    /* Живой фон (нейросеть) */
+    #bg {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
+      z-index: 0; pointer-events: none; opacity: .9;
+    }
+    .shell { position: relative; z-index: 1; }
   </style>
 </head>
 <body>
+  <canvas id="bg"></canvas>
+
   <div class="shell">
     <div class="brand">
       <div class="logo">C</div>
@@ -330,6 +340,89 @@
         submitBtn.classList.remove("loading");
       }
     });
+
+    // ---------- живой фон: нейросеть ----------
+    (function neuralBackground() {
+      const canvas = $("bg");
+      const ctx = canvas.getContext("2d");
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      let w, h, dpr, nodes = [], pulses = [];
+
+      const LINK_DIST = 150;
+      const SPEED = 0.18;
+
+      function resize() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        w = canvas.clientWidth; h = canvas.clientHeight;
+        canvas.width = w * dpr; canvas.height = h * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const count = Math.min(90, Math.round((w * h) / 18000));
+        nodes = Array.from({ length: count }, () => ({
+          x: Math.random() * w, y: Math.random() * h,
+          vx: (Math.random() - 0.5) * SPEED, vy: (Math.random() - 0.5) * SPEED,
+          r: 1.2 + Math.random() * 1.8,
+          phase: Math.random() * Math.PI * 2,
+        }));
+        pulses = [];
+      }
+
+      function spawnPulse() {
+        if (!nodes.length) return;
+        const a = nodes[(Math.random() * nodes.length) | 0];
+        let best = null, bestD = LINK_DIST;
+        for (const b of nodes) {
+          if (b === a) continue;
+          const d = Math.hypot(a.x - b.x, a.y - b.y);
+          if (d < bestD && Math.random() < 0.5) { best = b; bestD = d; }
+        }
+        if (best) pulses.push({ a, b: best, t: 0, speed: 0.012 + Math.random() * 0.02 });
+      }
+
+      let frame = 0;
+      function tick() {
+        ctx.clearRect(0, 0, w, h);
+        frame++;
+        if (frame % 26 === 0 && pulses.length < 30) spawnPulse();
+
+        for (let i = 0; i < nodes.length; i++) {
+          const a = nodes[i];
+          a.x += a.vx; a.y += a.vy;
+          if (a.x < 0 || a.x > w) a.vx *= -1;
+          if (a.y < 0 || a.y > h) a.vy *= -1;
+          for (let j = i + 1; j < nodes.length; j++) {
+            const b = nodes[j];
+            const d = Math.hypot(a.x - b.x, a.y - b.y);
+            if (d < LINK_DIST) {
+              ctx.strokeStyle = `rgba(108,140,255,${(1 - d / LINK_DIST) * 0.16})`;
+              ctx.lineWidth = 1;
+              ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            }
+          }
+        }
+        for (const n of nodes) {
+          const glow = 0.5 + 0.5 * Math.sin(frame * 0.02 + n.phase);
+          ctx.fillStyle = `rgba(138,108,255,${0.35 + glow * 0.4})`;
+          ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx.fill();
+        }
+        for (let i = pulses.length - 1; i >= 0; i--) {
+          const p = pulses[i];
+          p.t += p.speed;
+          if (p.t >= 1) { pulses.splice(i, 1); continue; }
+          const x = p.a.x + (p.b.x - p.a.x) * p.t;
+          const y = p.a.y + (p.b.y - p.a.y) * p.t;
+          ctx.fillStyle = `rgba(58,210,159,${0.9 * (1 - Math.abs(0.5 - p.t) * 2 * 0.6)})`;
+          ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      resize();
+      window.addEventListener("resize", resize);
+      if (reduced) {
+        tick();
+      } else {
+        (function loop() { tick(); requestAnimationFrame(loop); })();
+      }
+    })();
   </script>
 </body>
 </html>

@@ -177,9 +177,52 @@
     }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     .toast.err { border-color: rgba(255,107,129,.5); color: var(--err); }
+
+    /* ---------- Живой фон (нейросеть) ---------- */
+    #bg {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
+      z-index: 0; pointer-events: none;
+      opacity: .9;
+    }
+    /* Контент должен лежать поверх canvas-фона. */
+    #loading, #gate, #app { position: relative; z-index: 1; }
+
+    /* Карточка кликабельна (открыть подробно). */
+    .entry { cursor: pointer; }
+    .entry-body {
+      display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* ---------- Детальный просмотр записи ---------- */
+    .detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .detail-head h3 { margin: 0; font-size: 20px; line-height: 1.3; word-break: break-word; }
+    .close-x {
+      flex-shrink: 0; width: 32px; height: 32px; border-radius: 9px;
+      border: 1px solid var(--border); background: #0f1222; color: var(--muted);
+      cursor: pointer; font-size: 18px; line-height: 1; transition: .15s;
+    }
+    .close-x:hover { color: var(--text); border-color: var(--accent); }
+    .detail-section { margin-top: 16px; }
+    .detail-label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 6px; }
+    .detail-text {
+      white-space: pre-wrap; word-break: break-word;
+      font-size: 14px; line-height: 1.6; color: var(--text);
+      background: #0f1222; border: 1px solid var(--border); border-radius: 11px; padding: 12px 14px;
+    }
+    .detail-text.code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12.5px; }
+    .detail-url {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--accent); text-decoration: none; font-size: 14px; word-break: break-all;
+    }
+    .detail-url:hover { text-decoration: underline; }
+    .detail-foot { margin-top: 18px; font-size: 12px; color: var(--muted); }
   </style>
 </head>
 <body>
+  <canvas id="bg"></canvas>
+
   <!-- загрузка -->
   <div id="loading" class="center">
     <div class="spin"></div>
@@ -265,6 +308,11 @@
     </div>
   </div>
 
+  <!-- детальный просмотр одной записи -->
+  <div class="overlay" id="detail-overlay">
+    <div class="modal" id="detail-modal"></div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script>
@@ -285,7 +333,7 @@
     };
 
     const $ = (id) => document.getElementById(id);
-    let state = { q: "", tag: null, editing: null };
+    let state = { q: "", tags: [], editing: null };
 
     // ---------- helpers ----------
     function show(view) {
@@ -328,7 +376,7 @@
         : esc(e.content || "");
       const tags = (e.tags || []).map((tg) => `<span class="tag-mini">#${esc(tg.name)}</span>`).join("");
       return `
-        <div class="entry">
+        <div class="entry" data-id="${e.id}" title="Открыть запись">
           <div class="entry-head">
             <h3 class="entry-title">${esc(e.title)}</h3>
             <div class="entry-actions">
@@ -356,15 +404,15 @@
         const tags = res.ok ? await res.json() : [];
         const bar = $("tagbar");
         bar.innerHTML =
-          `<span class="chip ${state.tag === null ? "active" : ""}" data-tag="">Все</span>` +
-          tags.map((t) => `<span class="chip ${state.tag === t.name ? "active" : ""}" data-tag="${esc(t.name)}">#${esc(t.name)}</span>`).join("");
+          `<span class="chip ${state.tags.length === 0 ? "active" : ""}" data-tag="">Все</span>` +
+          tags.map((t) => `<span class="chip ${state.tags.includes(t.name) ? "active" : ""}" data-tag="${esc(t.name)}">#${esc(t.name)}</span>`).join("");
       } catch {}
     }
 
     async function loadEntries() {
       const params = new URLSearchParams();
       if (state.q) params.set("q", state.q);
-      if (state.tag) params.set("tag", state.tag);
+      state.tags.forEach((t) => params.append("tag", t));   // AND: ?tag=a&tag=b
       const qs = params.toString();
       let entries = [];
       try {
@@ -377,12 +425,71 @@
       $("grid").classList.toggle("hidden", entries.length === 0);
 
       $("grid").querySelectorAll("[data-edit]").forEach((b) =>
-        b.addEventListener("click", () => openEdit(entries.find((e) => e.id === b.dataset.edit))));
+        b.addEventListener("click", (ev) => { ev.stopPropagation(); openEdit(entries.find((e) => e.id === b.dataset.edit)); }));
       $("grid").querySelectorAll("[data-del]").forEach((b) =>
-        b.addEventListener("click", () => removeEntry(b.dataset.del)));
+        b.addEventListener("click", (ev) => { ev.stopPropagation(); removeEntry(b.dataset.del); }));
+      // Клик по карточке (вне кнопок) — открыть запись подробно.
+      $("grid").querySelectorAll(".entry").forEach((card) =>
+        card.addEventListener("click", () => openDetail(card.dataset.id)));
     }
 
     async function refresh() { await Promise.all([loadTags(), loadEntries()]); }
+
+    // ---------- детальный просмотр одной записи ----------
+    let currentDetail = null;
+
+    function detailView(e) {
+      const t = TYPES[e.type] || { label: e.type };
+      const stLabel = STATUS[e.status] || e.status;
+      const tags = (e.tags || []).map((tg) => `<span class="tag-mini">#${esc(tg.name)}</span>`).join("");
+      const urlBlock = e.url
+        ? `<div class="detail-section"><div class="detail-label">Ссылка</div>
+             <a class="detail-url" href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.url)} ↗</a></div>`
+        : "";
+      const contentBlock = e.content
+        ? `<div class="detail-section"><div class="detail-label">${e.type === "snippet" ? "Код" : "Текст"}</div>
+             <div class="detail-text ${e.type === "snippet" ? "code" : ""}">${esc(e.content)}</div></div>`
+        : "";
+      const tagsBlock = tags
+        ? `<div class="detail-section"><div class="detail-label">Теги</div><div class="entry-tags">${tags}</div></div>`
+        : "";
+      return `
+        <div class="detail-head">
+          <h3>${esc(e.title)}</h3>
+          <button class="close-x" id="detail-close" title="Закрыть">✕</button>
+        </div>
+        <div class="badges">
+          <span class="badge type">${esc(t.label)}</span>
+          <span class="badge st-${esc(e.status)}">${esc(stLabel)}</span>
+        </div>
+        ${urlBlock}${contentBlock}${tagsBlock}
+        <div class="detail-foot">Создано: ${fmtDate(e.created_at)}</div>
+        <div class="modal-actions">
+          <button class="btn danger" id="detail-del">Удалить</button>
+          <button class="btn primary" id="detail-edit">Изменить</button>
+        </div>`;
+    }
+
+    async function openDetail(id) {
+      try {
+        const res = await api("/" + id);              // GET /api/v1/entries/{id}
+        if (!res.ok) return toast("Не удалось открыть запись", true);
+        const e = await res.json();
+        currentDetail = e;
+        $("detail-modal").innerHTML = detailView(e);
+        $("detail-overlay").classList.add("show");
+        $("detail-close").addEventListener("click", closeDetail);
+        $("detail-edit").addEventListener("click", () => { closeDetail(); openEdit(e); });
+        $("detail-del").addEventListener("click", async () => { closeDetail(); await removeEntry(e.id); });
+      } catch (err) {
+        if (err.message !== "unauthorized") toast("Ошибка сети", true);
+      }
+    }
+
+    function closeDetail() {
+      $("detail-overlay").classList.remove("show");
+      currentDetail = null;
+    }
 
     // ---------- modal ----------
     function syncTypeFields() {
@@ -477,6 +584,7 @@
     $("f-type").addEventListener("change", syncTypeFields);
     $("entry-form").addEventListener("submit", submitEntry);
     $("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) closeModal(); });
+    $("detail-overlay").addEventListener("click", (e) => { if (e.target === $("detail-overlay")) closeDetail(); });
     $("logout-btn").addEventListener("click", async () => {
       // Выход на стороне auth: отзывает refresh в БД и чистит обе cookie.
       await fetch(AUTH_URL + "api/v1/auth/logout", { method: "POST", credentials: "include" });
@@ -486,7 +594,14 @@
     $("tagbar").addEventListener("click", (e) => {
       const chip = e.target.closest(".chip");
       if (!chip) return;
-      state.tag = chip.dataset.tag || null;
+      const name = chip.dataset.tag;
+      if (!name) {
+        state.tags = [];                       // «Все» — сброс
+      } else if (state.tags.includes(name)) {
+        state.tags = state.tags.filter((t) => t !== name);  // снять
+      } else {
+        state.tags.push(name);                 // добавить
+      }
       loadTags();
       loadEntries();
     });
@@ -497,7 +612,7 @@
       searchTimer = setTimeout(() => { state.q = e.target.value.trim(); loadEntries(); }, 280);
     });
 
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); closeDetail(); } });
 
     // ---------- init ----------
     (async function init() {
@@ -510,6 +625,93 @@
         await refresh();
       } catch {
         show("gate");
+      }
+    })();
+
+    // ---------- живой фон: нейросеть ----------
+    (function neuralBackground() {
+      const canvas = $("bg");
+      const ctx = canvas.getContext("2d");
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      let w, h, dpr, nodes = [], pulses = [];
+
+      const LINK_DIST = 150;     // на каком расстоянии узлы соединяются
+      const SPEED = 0.18;        // скорость дрейфа узлов
+
+      function resize() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        w = canvas.clientWidth; h = canvas.clientHeight;
+        canvas.width = w * dpr; canvas.height = h * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const count = Math.min(90, Math.round((w * h) / 18000));
+        nodes = Array.from({ length: count }, () => ({
+          x: Math.random() * w, y: Math.random() * h,
+          vx: (Math.random() - 0.5) * SPEED, vy: (Math.random() - 0.5) * SPEED,
+          r: 1.2 + Math.random() * 1.8,
+          phase: Math.random() * Math.PI * 2,    // для «дыхания» яркости
+        }));
+        pulses = [];
+      }
+
+      // Сигнал, бегущий по ребру между двумя узлами — нейрон «выстрелил».
+      function spawnPulse() {
+        if (!nodes.length) return;
+        const a = nodes[(Math.random() * nodes.length) | 0];
+        let best = null, bestD = LINK_DIST;
+        for (const b of nodes) {
+          if (b === a) continue;
+          const d = Math.hypot(a.x - b.x, a.y - b.y);
+          if (d < bestD && Math.random() < 0.5) { best = b; bestD = d; }
+        }
+        if (best) pulses.push({ a, b: best, t: 0, speed: 0.012 + Math.random() * 0.02 });
+      }
+
+      let frame = 0;
+      function tick() {
+        ctx.clearRect(0, 0, w, h);
+        frame++;
+        if (frame % 26 === 0 && pulses.length < 30) spawnPulse();
+
+        // рёбра
+        for (let i = 0; i < nodes.length; i++) {
+          const a = nodes[i];
+          a.x += a.vx; a.y += a.vy;
+          if (a.x < 0 || a.x > w) a.vx *= -1;
+          if (a.y < 0 || a.y > h) a.vy *= -1;
+          for (let j = i + 1; j < nodes.length; j++) {
+            const b = nodes[j];
+            const d = Math.hypot(a.x - b.x, a.y - b.y);
+            if (d < LINK_DIST) {
+              ctx.strokeStyle = `rgba(108,140,255,${(1 - d / LINK_DIST) * 0.16})`;
+              ctx.lineWidth = 1;
+              ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            }
+          }
+        }
+        // узлы (с лёгким «дыханием»)
+        for (const n of nodes) {
+          const glow = 0.5 + 0.5 * Math.sin(frame * 0.02 + n.phase);
+          ctx.fillStyle = `rgba(138,108,255,${0.35 + glow * 0.4})`;
+          ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2); ctx.fill();
+        }
+        // бегущие сигналы
+        for (let i = pulses.length - 1; i >= 0; i--) {
+          const p = pulses[i];
+          p.t += p.speed;
+          if (p.t >= 1) { pulses.splice(i, 1); continue; }
+          const x = p.a.x + (p.b.x - p.a.x) * p.t;
+          const y = p.a.y + (p.b.y - p.a.y) * p.t;
+          ctx.fillStyle = `rgba(58,210,159,${0.9 * (1 - Math.abs(0.5 - p.t) * 2 * 0.6)})`;
+          ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      resize();
+      window.addEventListener("resize", resize);
+      if (reduced) {
+        tick();                                  // один статичный кадр
+      } else {
+        (function loop() { tick(); requestAnimationFrame(loop); })();
       }
     })();
   </script>
