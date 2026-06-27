@@ -4,13 +4,14 @@
 задача гоняется локально через .apply(), а .delay() подменяется.
 """
 
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
 
 from app.models.entry import Entry, EntryStatus, EntryType
 from app.services.enrich import extract_from_url
-from app.worker.tasks import enrich_entry
+from app.worker.tasks import enrich_entry, sweep_stuck_pending
 
 ENTRIES = "/api/v1/entries/"
 
@@ -104,6 +105,24 @@ def test_task_marks_failed_on_value_error(task_db, monkeypatch):
 def test_task_noop_when_missing(task_db):
     result = enrich_entry.apply(args=[str(uuid4())])  # записи нет
     assert result.successful()  # задача не падает
+
+
+def test_sweep_reenqueues_only_old_pending(task_db, monkeypatch):
+    old = datetime.now(timezone.utc) - timedelta(minutes=5)
+    fresh = datetime.now(timezone.utc)
+    with task_db() as s:
+        old_id = _seed(s, created_at=old)  # зависла давно — должна попасть
+        _seed(s, created_at=fresh)  # свежая — в полёте, не трогаем
+
+    calls = []
+    monkeypatch.setattr(
+        "app.worker.tasks.enrich_entry.delay", lambda eid: calls.append(eid)
+    )
+
+    n = sweep_stuck_pending.apply().get()
+
+    assert n == 1
+    assert calls == [str(old_id)]  # только старую
 
 
 # ---------- постановка в очередь при создании (мок .delay, без Redis) ----------
