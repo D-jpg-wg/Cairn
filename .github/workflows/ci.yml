@@ -37,6 +37,7 @@ jobs:
         run: |
           mkdir -p keys
           openssl genpkey -algorithm RSA -out keys/jwt_private.pem -pkeyopt rsa_keygen_bits:2048
-          openssl rsa -pubout -in keys/jwt_private.pe, -out keys/jwt_public.pem
+          openssl rsa -pubout -in keys/jwt_private.pem, -out keys/jwt_public.pem
 
       - run: uv sync
+      - run: uv run pytest
