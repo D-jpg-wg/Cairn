@@ -315,10 +315,9 @@
         }
 
         if (mode === "login") {
-          if (data.access_token) localStorage.setItem("cairn_token", data.access_token);
-          showMsg(true, "С возвращением! Вход выполнен.");
-          // здесь можно перенаправить пользователя в приложение:
-          // window.location.href = "/";
+          // Токены (access + refresh) уже выставлены в httponly-cookie сервером.
+          showMsg(true, "С возвращением! Перенаправляем…");
+          window.location.href = "http://localhost:8001/";
         } else {
           showMsg(true, "Аккаунт создан. Теперь войдите.");
           document.querySelector('.tab[data-tab="login"]').click();

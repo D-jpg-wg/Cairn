@@ -25,6 +25,7 @@ class GoogleOAuthClient:
         self._redirect_uri = setting.google_redirect_url
 
     def build_authorization_url(self, state: str) -> str:
+        """Собирает URL страницы согласия Google с нашими параметрами и state."""
         params = {
             "client_id": self._client_id,
             "redirect_uri": self._redirect_uri,

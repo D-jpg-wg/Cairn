@@ -24,6 +24,10 @@ services:
     depends_on:
       auth-db:
         condition: service_healthy
+    # OAuth/session-настройки берём из .env сервиса (GOOGLE_*, SESSION_SECRET,
+    # ENVIRONMENT, APP_URL). environment ниже переопределяет пересекающиеся ключи.
+    env_file:
+      - ./services/auth/.env
     environment:
       APP_NAME: cairn-auth
       DB_HOST: auth-db

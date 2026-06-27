@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from starlette import status
 from starlette.responses import Response
 
-from app.core.deps import _COOKIE_NAME, get_current_user_id
+from app.core.deps import COOKIE_NAME, get_current_user_id
 
 router = APIRouter()
 
@@ -23,5 +23,5 @@ async def me(user_id: UUID = Depends(get_current_user_id)) -> dict:
 async def logout() -> Response:
     """Удаляет cookie с токеном (удобно для повторного теста входа)."""
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
-    response.delete_cookie(_COOKIE_NAME)
+    response.delete_cookie(COOKIE_NAME)
     return response

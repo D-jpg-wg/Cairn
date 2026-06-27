@@ -41,6 +41,7 @@ class Setting(BaseSettings):
 
     @property
     def db_url(self) -> str:
+        """Async DSN для подключения к Postgres."""
         return (
             f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
@@ -48,10 +49,12 @@ class Setting(BaseSettings):
 
     @property
     def jwt_private_key(self) -> str:
+        """Приватный RSA-ключ для подписи JWT."""
         return self.jwt_private_key_path.read_text()
 
     @property
     def jwt_public_key(self) -> str:
+        """Публичный RSA-ключ для проверки JWT."""
         return self.jwt_public_key_path.read_text()
 
 

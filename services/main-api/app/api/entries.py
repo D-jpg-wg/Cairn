@@ -19,6 +19,7 @@ router = APIRouter()
 def get_entry_service(
     session: AsyncSession = Depends(get_async_session),
 ) -> EntryService:
+    """Зависимость: собирает EntryService поверх сессии БД."""
     return EntryService(EntryRepository(session))
 
 
@@ -27,6 +28,7 @@ async def get_all_tags(
     service: EntryService = Depends(get_entry_service),
     owner_id: UUID = Depends(get_current_user_id),
 ) -> list[Tag]:
+    """Возвращает все теги текущего пользователя."""
     tags = await service.get_tags(owner_id)
     return tags
 
@@ -38,6 +40,7 @@ async def get_all_entry(
     service: EntryService = Depends(get_entry_service),
     owner_id: UUID = Depends(get_current_user_id),
 ) -> list[Entry]:
+    """Список записей пользователя с фильтром по тегу и поиском по тексту."""
     return await service.get_all_entries(owner_id, tag, q)
 
 
@@ -47,6 +50,7 @@ async def get_entry(
     service: EntryService = Depends(get_entry_service),
     owner_id: UUID = Depends(get_current_user_id),
 ) -> Optional[Entry]:
+    """Возвращает одну запись пользователя по id; 404, если не найдена."""
     result = await service.get_entry(entry_id=entry_id, owner_id=owner_id)
     result = check_exists_entry(result)
     return result
@@ -58,6 +62,7 @@ async def create_entry(
     service: EntryService = Depends(get_entry_service),
     owner_id: UUID = Depends(get_current_user_id),
 ) -> Entry:
+    """Создаёт запись для текущего пользователя."""
     return await service.create_entry(body, owner_id)
 
 
@@ -68,6 +73,7 @@ async def update_entry(
     service: EntryService = Depends(get_entry_service),
     owner_id: UUID = Depends(get_current_user_id),
 ) -> Entry:
+    """Частично обновляет запись пользователя; 404, если не найдена."""
     result = await service.update_entry(body, owner_id, entry_id)
     result = check_exists_entry(result)
     return result
@@ -79,6 +85,7 @@ async def delete_entry(
     service: EntryService = Depends(get_entry_service),
     owner_id: UUID = Depends(get_current_user_id),
 ) -> Response:
+    """Удаляет запись пользователя; 404, если не найдена."""
     deleted = await service.delete_entry(entry_id, owner_id)
     check_exists_entry(deleted)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

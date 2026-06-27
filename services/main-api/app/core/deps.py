@@ -5,13 +5,13 @@ from starlette import status
 
 from app.core.security import decode_access_token
 
-_COOKIE_NAME = "cairn_token"
+COOKIE_NAME = "cairn_token"
 
 
 def extract_token(request: Request) -> str | None:
     """Токен ищем сначала в cookie (его ставит auth после OAuth-входа),
     затем в заголовке Authorization: Bearer ..."""
-    token = request.cookies.get(_COOKIE_NAME)
+    token = request.cookies.get(COOKIE_NAME)
     if token:
         return token
     header = request.headers.get("Authorization", "")

@@ -13,11 +13,13 @@ _STATIC_DIR = Path(__file__).parent / "static"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Жизненный цикл приложения: на остановке закрывает движок БД."""
     yield
     await engine.dispose()
 
 
 def create_app() -> FastAPI:
+    """Собирает приложение: роуты и раздача статики."""
     app = FastAPI(title=setting.app_name, lifespan=lifespan)
 
     app.include_router(entries_router, prefix="/api/v1/entries", tags=["entries"])

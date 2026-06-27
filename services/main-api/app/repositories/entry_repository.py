@@ -10,10 +10,13 @@ from app.schemas.entry import EntryCreate, EntryUpdate
 
 
 class EntryRepository:
+    """Доступ к записям и тегам в БД."""
+
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
     async def _get_or_create_tags(self, names: list[str]) -> list[Tag]:
+        """Возвращает существующие теги по именам, недостающие создаёт (без дублей)."""
         if not names:
             return []
         unique = list(dict.fromkeys(names))  # дедуп, сохраняя порядок
@@ -25,6 +28,7 @@ class EntryRepository:
         return [by_name[name] for name in unique]
 
     async def get_by_id(self, entry_id: UUID, owner_id: UUID) -> Optional[Entry]:
+        """Запись по id в пределах владельца, с подгруженными тегами (или None)."""
         stmt = await self.session.execute(
             select(Entry)
             .where(Entry.id == entry_id, Entry.owner_id == owner_id)
@@ -38,6 +42,7 @@ class EntryRepository:
         tag: Optional[str] = None,
         q: Optional[str] = None,
     ) -> list[Entry]:
+        """Записи владельца (новые сверху) с фильтром по тегу и поиском в title/content."""
         stmt = (
             select(Entry)
             .where(Entry.owner_id == owner_id)
@@ -54,6 +59,7 @@ class EntryRepository:
         return list(result.scalars().all())
 
     async def create_entry(self, body: EntryCreate, owner_id: UUID) -> Entry:
+        """Создаёт запись владельца, привязывает теги и возвращает её с тегами."""
         data = body.model_dump()
         tags = data.pop("tags", [])
         entry = Entry(owner_id=owner_id, **data)
@@ -67,6 +73,7 @@ class EntryRepository:
     async def update_entry(
         self, entry_id: UUID, entry: EntryUpdate, owner_id: UUID
     ) -> Optional[Entry]:
+        """Обновляет только переданные поля записи владельца; теги заменяет, если заданы."""
         old_entry = await self.get_by_id(entry_id, owner_id)
         if old_entry is None:
             return None
@@ -81,6 +88,7 @@ class EntryRepository:
         return old_entry
 
     async def delete_entry(self, entry_id: UUID, owner_id: UUID) -> Optional[Entry]:
+        """Удаляет запись владельца и возвращает её (или None, если не найдена)."""
         entry = await self.get_by_id(entry_id, owner_id)
         if entry is None:
             return None
@@ -89,6 +97,7 @@ class EntryRepository:
         return entry
 
     async def get_tags(self, owner_id: UUID) -> list[Tag]:
+        """Уникальные теги, встречающиеся в записях владельца."""
         tags = await self.session.execute(
             select(Tag).join(Tag.entries).where(Entry.owner_id == owner_id).distinct()
         )
