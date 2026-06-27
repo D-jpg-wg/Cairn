@@ -126,6 +126,25 @@ services:
     command: uv run celery -A app.worker.celery_app worker --loglevel=info
     restart: unless-stopped
 
+  main-api-beat:
+    build: ./services/main-api
+    depends_on:
+      main-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_NAME: cairn-main-api
+      DB_HOST: main-db
+      DB_PORT: 5432
+      DB_NAME: ${MAIN_DB_NAME:-cairn_main}
+      DB_USER: ${MAIN_DB_USER:-cairn}
+      DB_PASSWORD: ${MAIN_DB_PASSWORD:-cairn}
+      CELERY_BROKER_URL: redis://redis:6379/0
+    entrypoint: []
+    command: uv run celery -A app.worker.celery_app beat --loglevel=info
+    restart: unless-stopped
+
 volumes:
   auth-db-data:
   main-db-data:
