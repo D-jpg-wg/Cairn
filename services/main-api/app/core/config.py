@@ -16,6 +16,8 @@ class Setting(BaseSettings):
 
     celery_broker_url: str = "redis://localhost:6379/0"
 
+    kafka_bootstrap_servers: str = "localhost:9092"
+
     # main-api только ПРОВЕРЯЕТ JWT — нужен лишь публичный ключ auth-сервиса.
     jwt_public_key_path: Path = Path("keys/jwt_public.pem")
 

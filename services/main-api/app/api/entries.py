@@ -1,10 +1,13 @@
 from typing import Optional
 from uuid import UUID
+
 from fastapi import Depends, APIRouter, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
-from starlette.responses import Response
+from starlette.requests import Request
+from starlette.responses import Response, StreamingResponse
 
+from app.events import subscribe_status
 from app.core.deps import get_current_user_id
 from app.models import Entry, Tag
 from app.repositories.entry_repository import EntryRepository
@@ -31,6 +34,32 @@ async def get_all_tags(
     """Возвращает все теги текущего пользователя."""
     tags = await service.get_tags(owner_id)
     return tags
+
+
+@router.get("/stream")
+async def stream_entries(
+    request: Request,
+    owner_id: UUID = Depends(get_current_user_id),
+) -> StreamingResponse:
+    """Long-lived SSE: пушит {id, status} при смене статуса записей юзера."""
+
+    async def event_gen():
+        # Транспорт (Redis) живёт в app.events; здесь — только SSE-обёртка.
+        async for data in subscribe_status(owner_id):
+            if await request.is_disconnected():
+                break
+            # data is None — тик без событий, шлём heartbeat-комментарий, чтобы прокси
+            # не рвал «немое» соединение.
+            yield ": keep-alive\n\n" if data is None else f"data: {data}\n\n"
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # отключить буферизацию у nginx
+        },
+    )
 
 
 @router.get("/", response_model=list[EntryRead], status_code=status.HTTP_200_OK)

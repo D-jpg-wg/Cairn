@@ -3,6 +3,7 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/services/main-api" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/services/search" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/services/auth/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/services/main-api/.venv" />

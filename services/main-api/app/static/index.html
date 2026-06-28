@@ -435,6 +435,29 @@
 
     async function refresh() { await Promise.all([loadTags(), loadEntries()]); }
 
+    // ---------- live-обновление статусов (SSE) ----------
+    // Сервер держит открытое соединение и шлёт {id, status}, когда воркер дотянул
+    // запись (pending → ready/failed). Cookie уходит сама — same-origin.
+    let es = null;
+
+    function connectStream() {
+      if (es) es.close();
+      es = new EventSource(API + "/stream");
+
+      es.onmessage = (ev) => {
+        const { id } = JSON.parse(ev.data);
+        // Событие — лишь сигнал «перечитай». Свежие данные тянем из БД обычным API:
+        // перерисовываем сетку целиком (дёшево и переинициализирует все слушатели).
+        loadEntries();
+        // Если открыта детальная карточка этой записи — обновим и её.
+        if (currentDetail && currentDetail.id === id) openDetail(id);
+      };
+
+      es.onerror = () => {
+        // EventSource переподключается сам — ничего делать не нужно.
+      };
+    }
+
     // ---------- детальный просмотр одной записи ----------
     let currentDetail = null;
 
@@ -586,6 +609,7 @@
     $("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) closeModal(); });
     $("detail-overlay").addEventListener("click", (e) => { if (e.target === $("detail-overlay")) closeDetail(); });
     $("logout-btn").addEventListener("click", async () => {
+      if (es) es.close();        // закрыть SSE перед выходом
       // Выход на стороне auth: отзывает refresh в БД и чистит обе cookie.
       await fetch(AUTH_URL + "api/v1/auth/logout", { method: "POST", credentials: "include" });
       window.location.href = AUTH_URL;
@@ -623,6 +647,7 @@
         $("user-id").textContent = me.user_id.slice(0, 8);
         show("app");
         await refresh();
+        connectStream();          // живые апдейты статусов без F5
       } catch {
         show("gate");
       }

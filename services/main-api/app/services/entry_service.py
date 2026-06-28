@@ -6,6 +6,7 @@ from app.models.entry import ENRICHABLE_TYPES
 from app.worker.tasks import enrich_entry
 from app.repositories.entry_repository import EntryRepository
 from app.schemas.entry import EntryCreate, EntryUpdate
+from app.kafka.messaging import publish_event
 
 
 class EntryService:
@@ -29,6 +30,16 @@ class EntryService:
         entry = await self.repo.create_entry(body, owner_id)
         if entry.type in ENRICHABLE_TYPES:
             enrich_entry.delay(str(entry.id))
+        await publish_event(
+            "entry.created",
+            key=str(entry.id),
+            value={
+                "id": str(entry.id),
+                "owner_id": str(entry.owner_id),
+                "type": entry.type.value,
+                "url": entry.url,
+            },
+        )
         return entry
 
     async def update_entry(

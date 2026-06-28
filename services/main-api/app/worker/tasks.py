@@ -8,10 +8,15 @@ from app.db.sync_session import SyncSession
 from app.models.entry import Entry, EntryStatus, ENRICHABLE_TYPES
 from app.services.enrich import extract_from_url
 from app.worker.celery_app import celery_app
+from app.events import publish_status
 
 
 _STUCK_AFTER = timedelta(minutes=2)
 _SWEEP_BATCH = 50
+
+
+def _publish(entry: Entry) -> None:
+    publish_status(entry.owner_id, entry.id, entry.status.value)
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=10)
@@ -28,16 +33,19 @@ def enrich_entry(self, entry_id: str) -> None:
             if self.request.retries >= self.max_retries:
                 entry.status = EntryStatus.FAILED
                 session.commit()
+                _publish(entry)
                 return
             raise self.retry(exc=exc)
         except ValueError:
             entry.status = EntryStatus.FAILED
             session.commit()
+            _publish(entry)
             return
 
         entry.content = text
         entry.status = EntryStatus.READY
         session.commit()
+        _publish(entry)
 
 
 @celery_app.task
