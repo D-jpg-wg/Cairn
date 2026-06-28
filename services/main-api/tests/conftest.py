@@ -99,6 +99,20 @@ def auth():
     return _auth
 
 
+@pytest.fixture(autouse=True)
+def _no_kafka(monkeypatch):
+    """В тестах lifespan приложения не выполняется, поэтому Kafka-продюсер не поднят.
+
+    Глушим публикацию событий, чтобы create_entry не падал на `publish_event`.
+    Патчим имя в месте использования (entry_service), а не в самом messaging.
+    """
+
+    async def _noop(*args, **kwargs) -> None:
+        return None
+
+    monkeypatch.setattr("app.services.entry_service.publish_event", _noop)
+
+
 @pytest.fixture(scope="session")
 def pg_url() -> str:
     with PostgresContainer("postgres:17-alpine") as pg:
