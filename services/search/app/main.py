@@ -1,9 +1,11 @@
 import asyncio
 import json
+import app.grpc_gen  # noqa: F401
 
 from aiokafka import AIOKafkaConsumer
 
 from app.core.config import settings
+from app.grpc_server import serve as serve_grpc
 
 
 async def consume() -> None:
@@ -24,5 +26,9 @@ async def consume() -> None:
         await consumer.stop()
 
 
+async def main() -> None:
+    await asyncio.gather(consume(), serve_grpc())
+
+
 if __name__ == "__main__":
-    asyncio.run(consume())
+    asyncio.run(main())

@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package search.v1;
+
+// Сервис семантического поиска. Пока - только один вызов.
+service SearchService {
+  // Запрос-ответ (unary): по тексту запроса вернуть id похожих записей.
+  rpc Search(SearchRequest) returns (SearchResponse);
+}
+
+message SearchRequest {
+  string owner_id = 1; // ищем только в записях этого пользователя
+  string query = 2; // что ищем (текст)
+  uint32 limit = 3; // сколько максимум вернуть
+}
+
+message SearchResponse {
+  repeated string entry_ids = 1; // id найденных записей, по убыванию релевантности
+}

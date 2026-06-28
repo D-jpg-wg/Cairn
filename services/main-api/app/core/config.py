@@ -18,6 +18,8 @@ class Setting(BaseSettings):
 
     kafka_bootstrap_servers: str = "localhost:9092"
 
+    search_grpc_addr: str = "localhost:50051"
+
     # main-api только ПРОВЕРЯЕТ JWT — нужен лишь публичный ключ auth-сервиса.
     jwt_public_key_path: Path = Path("keys/jwt_public.pem")
 

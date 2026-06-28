@@ -88,6 +88,7 @@ services:
       # main-api только ПРОВЕРЯЕТ JWT — нужен лишь публичный ключ auth-сервиса.
       JWT_PUBLIC_KEY_PATH: /run/secrets/jwt_public_key
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SEARCH_GRPC_ADDR: search:50051
     ports:
       - "${MAIN_PORT:-8001}:8000"   # 8000 уже занят auth — наружу отдаём 8001
     secrets:
@@ -155,6 +156,9 @@ services:
     environment:
       APP_NAME: cairn-search
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      GRPC_PORT: 50051
+    ports:
+      - "50051:50051"
     restart: unless-stopped
 
   main-api-worker:

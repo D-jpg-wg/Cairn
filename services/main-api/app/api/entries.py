@@ -9,6 +9,7 @@ from starlette.responses import Response, StreamingResponse
 
 from app.events import subscribe_status
 from app.core.deps import get_current_user_id
+from app.grpc_client import search_entries
 from app.models import Entry, Tag
 from app.repositories.entry_repository import EntryRepository
 from app.schemas.entry import EntryRead, EntryCreate, EntryUpdate, TagRead
@@ -60,6 +61,16 @@ async def stream_entries(
             "X-Accel-Buffering": "no",  # отключить буферизацию у nginx
         },
     )
+
+
+@router.get("/search")
+async def semantic_search(
+    q: str,
+    owner_id: UUID = Depends(get_current_user_id),
+) -> dict:
+    """Семантический поиск: спрашивает search-сервис по gRPC, возвращает id похожих."""
+    ids = await search_entries(owner_id=str(owner_id), query=q, limit=10)
+    return {"query": q, "entry_ids": ids}
 
 
 @router.get("/", response_model=list[EntryRead], status_code=status.HTTP_200_OK)

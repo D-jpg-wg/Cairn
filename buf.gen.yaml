@@ -1,0 +1,10 @@
+version: v2
+plugins:
+  - remote: buf.build/protocolbuffers/python
+    out: services/main-api/app/grpc_gen
+  - remote: buf.build/grpc/python
+    out: services/main-api/app/grpc_gen
+  - remote: buf.build/protocolbuffers/python
+    out: services/search/app/grpc_gen
+  - remote: buf.build/grpc/python
+    out: services/search/app/grpc_gen

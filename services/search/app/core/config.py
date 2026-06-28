@@ -6,6 +6,7 @@ class Settings(BaseSettings):
 
     app_name: str = "cairn-search"
     kafka_bootstrap_servers: str = "localhost:9092"
+    grpc_port: int = 50051
 
 
 settings = Settings()
