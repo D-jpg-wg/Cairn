@@ -5,6 +5,11 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /code
 
+# curl нужен для лёгкого healthcheck (дешевле, чем старт python-интерпретатора).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN pip install uv --no-cache-dir
 
 # Зависимости ставим отдельным слоем — кэшируется, пока не менялись pyproject/uv.lock.
