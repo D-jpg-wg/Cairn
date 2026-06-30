@@ -107,7 +107,7 @@ services:
       - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 3s
       retries: 5
 
@@ -177,7 +177,7 @@ services:
       DB_PASSWORD: ${MAIN_DB_PASSWORD:-cairn}
       CELERY_BROKER_URL: redis://redis:6379/0
     entrypoint: []
-    command: uv run celery -A app.worker.celery_app worker --loglevel=info
+    command: celery -A app.worker.celery_app worker --loglevel=info
     restart: unless-stopped
 
   main-api-beat:
@@ -196,7 +196,7 @@ services:
       DB_PASSWORD: ${MAIN_DB_PASSWORD:-cairn}
       CELERY_BROKER_URL: redis://redis:6379/0
     entrypoint: []
-    command: uv run celery -A app.worker.celery_app beat --loglevel=info
+    command: celery -A app.worker.celery_app beat --loglevel=info --schedule=/tmp/celerybeat-schedule
     restart: unless-stopped
 
 volumes:

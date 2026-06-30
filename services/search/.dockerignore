@@ -1,0 +1,11 @@
+# Локальное окружение и артефакты — в образ не нужны.
+.venv
+__pycache__/
+*.pyc
+.pytest_cache
+.ruff_cache
+
+# Прочее
+tests
+.git
+*.md

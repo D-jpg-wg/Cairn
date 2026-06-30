@@ -16,11 +16,8 @@ dependencies = [
     "psycopg2-binary>=2.9.12",
     "pydantic-settings>=2.14.2",
     "pyjwt[crypto]>=2.13.0",
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
     "redis>=8.0.1",
     "sqlalchemy>=2.0.51",
-    "testcontainers>=4.14.2",
     "trafilatura>=2.1.0",
     "uvicorn[standard]>=0.49.0",
 ]
@@ -31,7 +28,9 @@ package = false
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
-    "pytest>=8.3.4",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "testcontainers>=4.14.2",
 ]
 
 [tool.pytest.ini_options]

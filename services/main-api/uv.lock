@@ -159,11 +159,8 @@ dependencies = [
     { name = "psycopg2-binary" },
     { name = "pydantic-settings" },
     { name = "pyjwt", extra = ["crypto"] },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
     { name = "redis" },
     { name = "sqlalchemy" },
-    { name = "testcontainers" },
     { name = "trafilatura" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -172,6 +169,8 @@ dependencies = [
 dev = [
     { name = "httpx" },
     { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "testcontainers" },
 ]
 
 [package.metadata]
@@ -189,11 +188,8 @@ requires-dist = [
     { name = "psycopg2-binary", specifier = ">=2.9.12" },
     { name = "pydantic-settings", specifier = ">=2.14.2" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.13.0" },
-    { name = "pytest", specifier = ">=9.1.1" },
-    { name = "pytest-asyncio", specifier = ">=1.4.0" },
     { name = "redis", specifier = ">=8.0.1" },
     { name = "sqlalchemy", specifier = ">=2.0.51" },
-    { name = "testcontainers", specifier = ">=4.14.2" },
     { name = "trafilatura", specifier = ">=2.1.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.49.0" },
 ]
@@ -201,7 +197,9 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "pytest", specifier = ">=8.3.4" },
+    { name = "pytest", specifier = ">=9.1.1" },
+    { name = "pytest-asyncio", specifier = ">=1.4.0" },
+    { name = "testcontainers", specifier = ">=4.14.2" },
 ]
 
 [[package]]

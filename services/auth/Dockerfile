@@ -1,27 +1,41 @@
+# ---------- builder: тут живут uv, кэши и сборка venv ----------
+FROM python:3.14-slim AS builder
+
+# uv как бинарь из официального образа — без слоя `pip install uv`.
+COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /bin/uv
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0
+
+WORKDIR /code
+
+# Слой зависимостей кэшируется отдельно от кода.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
+
+# ---------- runtime: чистый образ, только venv + код + curl ----------
 FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-WORKDIR /code
-
-# curl нужен для лёгкого healthcheck (дешевле, чем старт python-интерпретатора).
+# curl — для лёгкого healthcheck (см. docker-compose.yml).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 1000 appuser
 
-RUN pip install uv --no-cache-dir
+WORKDIR /code
 
-# Зависимости ставим отдельным слоем — кэшируется, пока не менялись pyproject/uv.lock.
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+# venv из builder и код — одним COPY с нужным владельцем (без дубль-chown слоя).
+COPY --from=builder --chown=appuser:appuser /code/.venv /code/.venv
+COPY --chown=appuser:appuser . .
 
-COPY . .
+# venv в PATH → uv в рантайме не нужен, бинари (alembic/uvicorn) берутся из него.
+ENV PATH="/code/.venv/bin:$PATH"
 
-# Запускаемся из-под непривилегированного пользователя.
-RUN chmod +x entrypoint.sh \
-    && useradd --create-home --uid 1000 appuser \
-    && chown -R appuser:appuser /code
+RUN chmod +x entrypoint.sh
 USER appuser
 
 EXPOSE 8000
