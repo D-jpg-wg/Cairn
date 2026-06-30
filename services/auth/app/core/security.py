@@ -51,6 +51,11 @@ def generate_refresh_token() -> str:
     return secrets.token_urlsafe(48)
 
 
+def generate_link_code() -> str:
+    """Одноразовый код привязки бота (отдается юзеру в сыром виде)."""
+    return secrets.token_urlsafe(32)
+
+
 def hash_refresh_token(raw: str) -> str:
     """Хэширует refresh-токен (sha256) — в БД хранится только хэш."""
     return hashlib.sha256(raw.encode()).hexdigest()

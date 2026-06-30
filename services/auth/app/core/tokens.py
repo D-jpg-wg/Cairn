@@ -9,6 +9,7 @@ from datetime import timedelta
 # Время жизни токенов.
 ACCESS_TTL = timedelta(minutes=15)
 REFRESH_TTL = timedelta(days=30)
+LINK_CODE_TTL = timedelta(minutes=5)
 
 # Имена и путь cookie сессии.
 ACCESS_COOKIE = "cairn_token"

@@ -23,3 +23,17 @@ class UserRead(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class LinkCodeResponse(BaseModel):
+    code: str
+
+
+class LinkCodeRedeem(BaseModel):
+    code: str
+
+
+class TokenPairResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"

@@ -8,8 +8,9 @@ from app.core.security import (
     create_access_token,
     generate_refresh_token,
     hash_refresh_token,
+    generate_link_code,
 )
-from app.core.tokens import REFRESH_TTL
+from app.core.tokens import REFRESH_TTL, LINK_CODE_TTL
 from app.models import User
 from app.repositories.user_repository import AuthRepository
 from app.schemas.user import UserCreate, LoginRequest
@@ -82,3 +83,30 @@ class AuthService:
         token = await self.repo.get_refresh_token(hash_refresh_token(raw_refresh))
         if token:
             await self.repo.revoke_refresh_token(token)
+
+    async def create_link_code(self, user: User) -> str:
+        """Выдает одноразовый код привязки: в БД кладем хэш, наружу - сырой код."""
+        raw = generate_link_code()
+        await self.repo.create_link_code(
+            user_id=user.uuid,
+            code_hash=hash_refresh_token(raw),
+            expires_at=datetime.now(timezone.utc) + LINK_CODE_TTL,
+        )
+        return raw
+
+    async def redeem_link_code(self, raw_code: str) -> tuple[str, str]:
+        """меняет валидный код на пару токенов и гасит код (одноразовость)."""
+        link = await self.repo.get_link_code(hash_refresh_token(raw_code))
+        if not link or link.used or link.expires_at < datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired link",
+            )
+        await self.repo.mark_link_code_used(link)
+        user = await self.repo.get_by_uuid(str(link.user_id))
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+            )
+        return await self.issue_tokens(user)

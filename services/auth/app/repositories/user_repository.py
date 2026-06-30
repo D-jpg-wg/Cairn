@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
 from app.models.refresh_token import RefreshToken
+from app.models.link_code import LinkCode
 
 
 class AuthRepository:
@@ -52,3 +53,24 @@ class AuthRepository:
         await self.session.commit()
         await self.session.refresh(user)
         return user
+
+    async def create_link_code(
+        self, user_id: UUID, code_hash: str, expires_at: datetime
+    ) -> None:
+        """Сохраняет хэш одноразового кода с привязкой к юзеру и сроком жизни."""
+        self.session.add(
+            LinkCode(user_id=user_id, code_hash=code_hash, expires_at=expires_at)
+        )
+        await self.session.commit()
+
+    async def get_link_code(self, code_hash: str) -> LinkCode | None:
+        """Находит код по его хэшу (или None)."""
+        res = await self.session.execute(
+            select(LinkCode).where(LinkCode.code_hash == code_hash)
+        )
+        return res.scalars().first()
+
+    async def mark_link_code_used(self, link: LinkCode) -> None:
+        """Помечает код использованным - повторно его не разменять."""
+        link.used = True
+        await self.session.commit()

@@ -19,7 +19,14 @@ from app.core.tokens import (
 from app.db.db_engine import get_async_session
 from app.models import User
 from app.repositories.user_repository import AuthRepository
-from app.schemas.user import UserCreate, LoginRequest, UserRead
+from app.schemas.user import (
+    UserCreate,
+    LoginRequest,
+    UserRead,
+    LinkCodeResponse,
+    LinkCodeRedeem,
+    TokenPairResponse,
+)
 from app.services.auth_service import AuthService
 from app.services.google_oauth import GoogleOAuthClient
 
@@ -86,6 +93,30 @@ async def login(
 async def get_me(current_user: User = Depends(get_current_user)):
     """Возвращает текущего пользователя по access-токену."""
     return current_user
+
+
+@router.post("/link-code", response_model=LinkCodeResponse)
+@limiter.limit("5/minute")
+async def create_link_code(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    service: AuthService = Depends(get_auth_service),
+):
+    """Залогиненный юзер получает одноразовый код для привязки Telegram-бота."""
+    code = await service.create_link_code(current_user)
+    return LinkCodeResponse(code=code)
+
+
+@router.post("/link-code/redeem", response_model=TokenPairResponse)
+@limiter.limit("10/minute")
+async def redeem_link_code(
+    request: Request,
+    body: LinkCodeRedeem,
+    service: AuthService = Depends(get_auth_service),
+):
+    """Бот меняет одноразовый код на пару токенов (JSON, not cookie)."""
+    access, refresh = await service.redeem_link_code(body.code)
+    return TokenPairResponse(access_token=access, refresh_token=refresh)
 
 
 @router.get("/oauth/google")
