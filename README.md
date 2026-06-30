@@ -1,5 +1,18 @@
 # Cairn
 
+[![CI](https://github.com/D-jpg-wg/Cairn/actions/workflows/ci.yml/badge.svg)](https://github.com/D-jpg-wg/Cairn/actions/workflows/ci.yml)
+[![Python 3.14](https://img.shields.io/badge/python-3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-231F20?logo=apachekafka&logoColor=white)](https://kafka.apache.org/)
+[![Redis](https://img.shields.io/badge/Redis-FF4438?logo=redis&logoColor=white)](https://redis.io/)
+[![gRPC](https://img.shields.io/badge/gRPC-244c5a?logo=grpc&logoColor=white)](https://grpc.io/)
+[![Docker](https://img.shields.io/badge/Docker%20Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+
 Личная база знаний — сервис, куда стекаются заметки, ссылки, код-сниппеты и
 спарсенные статьи (веб, Telegram-бот, парсер), а затем находятся обратно: по
 тегу, по тексту или по смыслу (семантический поиск на дальних фазах).
@@ -13,6 +26,47 @@ Celery — фон внутри сервиса, observability — как выгл
 Полная архитектура, схемы путей передачи и дорожная карта по фазам 0–8 —
 в [`roadmap.html`](./roadmap.html) (открыть в браузере).
 
+## Дорожная карта — текущий статус
+
+| Фаза | Что | Статус |
+|------|-----|--------|
+| 00 | Подготовка: монорепо, окружение, pre-commit | ✅ готово |
+| 01 | Скелет: `auth` (JWT) + `main-api`, database-per-service | ✅ готово |
+| 02 | Асинхронность: Celery + Redis, Kafka, первый gRPC-вызов | ✅ готово |
+| 03 | Бот: Aiogram-сервис, REST к Main API + consumer Kafka | 🔜 следующая |
+| 04 | Парсинг: Scrapy по расписанию → Kafka | ⬜ |
+| 05 | Наблюдаемость: логи, health-checks, Prometheus + Grafana | ⬜ |
+| 06 | CI/CD: сборка образов, push в registry | 🟡 частично (lint+test на PR) |
+| 07 | Kubernetes: Helm, Ingress | ⬜ |
+| 08 | ML-сервис: инференс embeddings | ⬜ |
+
+## Архитектура
+
+Три разных пути для трёх разных задач — внешний трафик (REST), внутренние
+синхронные вызовы (gRPC) и события (Kafka):
+
+```
+                    ┌──────────────┐
+   клиенты ──REST──▶│   main-api   │──gRPC──▶  search   (топ похожих заметок)
+   (web, bot)       │   FastAPI    │
+                    │   ядро       │──events─▶  Kafka  ──▶ bot / parser
+                    └──────┬───────┘
+                           │ проверяет JWT (public key)
+                    ┌──────▼───────┐         ┌──────────────────────┐
+                    │     auth     │         │ Celery worker + beat  │
+                    │  JWT / OAuth │         │ фон внутри main-api   │
+                    └──────────────┘         └──────────┬───────────┘
+                       │                                 │
+                  auth-db (PG)   main-db (PG)         redis (брокер)
+```
+
+- **`auth`** выдаёт и подписывает JWT (приватным ключом). **`main-api`** только
+  *проверяет* токены публичным ключом — приватного ключа у него нет.
+- **database-per-service**: у `auth` и `main-api` свои Postgres-инстансы, никто
+  не лезет в чужую схему — только через сеть (REST / gRPC / Kafka).
+- **`search`** — пока gRPC-заглушка (контракт из `proto/`, реальной логики
+  поиска ещё нет); это полигон для кодогенерации, deadline, grpcurl.
+
 ## Что такое монорепо здесь
 
 Один git-репозиторий, внутри — **несколько самостоятельных сервисов**. Это не
@@ -24,11 +78,11 @@ Celery — фон внутри сервиса, observability — как выгл
 ```
 Cairn/
 ├── services/
-│   ├── auth/         JWT, OAuth2 · своя БД (FastAPI)
-│   ├── main-api/     ядро, бизнес-логика (FastAPI)
-│   ├── bot/          Telegram-бот (Aiogram)
-│   ├── parser/       парсинг по расписанию (Scrapy)
-│   └── search/       поиск / embeddings
+│   ├── auth/         JWT, OAuth2 · своя БД (FastAPI)        ✅
+│   ├── main-api/     ядро, бизнес-логика, Celery, Kafka     ✅
+│   ├── search/       gRPC-сервис (заглушка под embeddings)  ✅
+│   ├── bot/          Telegram-бот (Aiogram)                 🔜 скелет
+│   └── parser/       парсинг по расписанию (Scrapy)         ⬜ скелет
 │       ├── pyproject.toml   зависимости ТОЛЬКО этого сервиса
 │       ├── app/             код
 │       ├── alembic/         миграции его БД (где нужна)
@@ -50,7 +104,7 @@ Cairn/
    отдельный проект: пишешь код, добавляешь зависимости, гоняешь тесты.
    Зависимости одного сервиса не видят зависимостей другого — это специально.
 2. **Уровень репозитория** (корень) — общие вещи, касающиеся всех:
-   `docker-compose up`, контракты в `proto/`, pre-commit и CI.
+   `docker compose up`, контракты в `proto/`, pre-commit и CI.
 
 Граница между уровнями — и есть «микросервисность». Сервис общается с другим
 **не импортом Python-кода**, а через сеть: REST, gRPC (контракт в `proto/`) или
@@ -64,7 +118,33 @@ Cairn/
   рядом с его `pyproject.toml`.
 - Линтер/форматтер — **ruff** через pre-commit.
 
-## Как работать над одним сервисом
+## Быстрый старт — весь стек локально
+
+```bash
+# из корня репозитория
+docker compose up --build      # все сервисы + postgres / kafka / redis разом
+```
+
+Образы запекают код внутрь — после правок нужен `--build`, иначе в контейнере
+останется старая версия.
+
+После старта поднимаются:
+
+| Сервис | Адрес | Назначение |
+|--------|-------|------------|
+| `auth` | http://localhost:8000 | регистрация/логин, JWT |
+| `main-api` | http://localhost:8001 | ядро, бизнес-логика (Swagger на `/docs`) |
+| `search` | `localhost:50051` | gRPC-сервис (заглушка) |
+| `kafka-ui` | http://localhost:8080 | веб-просмотр топиков Kafka |
+| `auth-db` | `localhost:5432` | Postgres сервиса auth |
+| `main-db` | `localhost:5433` | Postgres сервиса main-api |
+| `redis` | `localhost:6379` | брокер Celery + кэш |
+| `kafka` | `localhost:9092` | шина событий |
+
+Рядом с `main-api` поднимаются `main-api-worker` (Celery worker) и
+`main-api-beat` (Celery beat) из того же образа.
+
+## Работа над одним сервисом
 
 ```bash
 cd services/auth                       # спускаешься на уровень сервиса
@@ -77,21 +157,14 @@ uv add "fastapi[standard]"             # добавить зависимость
 Переключаешься на другой сервис — просто `cd` в его папку, `uv run` подхватит
 уже его окружение.
 
-## Как поднять весь стек локально
-
-```bash
-# из корня репозитория
-docker-compose up        # все сервисы + postgres / kafka / redis разом
-```
-
-(наполняется начиная с фаз 01–02 — пока заготовка).
-
 ## Контракты gRPC — `proto/`
 
 В `proto/` лежат `.proto`-контракты на вызовы между сервисами (сборка через
 **buf**). Из них кодогенерацией получаются Python-классы для обеих сторон
-вызова; сгенерированный код кладётся в `services/*/app/grpc_gen/` и намеренно
-**не коммитится** (он в `.gitignore`) — генерируется локально и в CI.
+вызова; сгенерированный код кладётся в `services/*/app/grpc_gen/`. Номера полей
+в `.proto` — это контракт на проводе: новые поля добавлять можно, переиспользовать
+или удалять старый номер — нельзя. На каждый gRPC-вызов ставится deadline,
+обработчики идемпотентны (ретраи могут прислать вызов дважды).
 
 ## Pre-commit
 
@@ -102,16 +175,13 @@ uvx pre-commit install        # один раз — поставить git-ху�
 uvx pre-commit run --all-files
 ```
 
-## С чего начать (фазы 00 → 01)
+## CI
 
-Сейчас скелет репо есть, но `pyproject.toml` сервисов и `docker-compose.yml`
-пустые. По роадмапу:
+`.github/workflows/ci.yml` на каждый PR гоняет `ruff check` по всему репо и
+тесты — но **только для изменённых сервисов** (path-filters через
+`dorny/paths-filter`), чтобы не пересобирать всё подряд. Для `auth` в CI
+генерируются временные JWT-ключи.
 
-1. **Фаза 00:** заполнить `pyproject.toml` для `auth` и `main-api`, поставить
-   pre-commit.
-2. **Фаза 01:** поднять `auth` (FastAPI + JWT + своя БД) и `main-api`, связать,
-   покрыть тестами — первый сквозной путь из двух сервисов.
+## Лицензия
 
-Принцип: не настраивать всё сразу. Доводишь один сервис до рабочего состояния
-как обычный проект; связь между сервисами (gRPC, Kafka) добавляешь только когда
-есть минимум два живых сервиса, которым реально нужно поговорить.
+[MIT](./LICENSE).
