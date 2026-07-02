@@ -42,6 +42,8 @@ class EntryRepository:
         owner_id: UUID,
         tag: Optional[list[str]] = None,
         q: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
     ) -> list[Entry]:
         """Записи владельца (новые сверху). tag фильтрует по ЛЮБОМУ из тегов (OR),
         q ищет подстроку в title/content."""
@@ -61,7 +63,7 @@ class EntryRepository:
             stmt = stmt.where(
                 or_(Entry.title.ilike(f"%{q}%"), Entry.content.ilike(f"%{q}%"))
             )
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(stmt.limit(limit).offset(offset))
         return list(result.scalars().all())
 
     async def create_entry(self, body: EntryCreate, owner_id: UUID) -> Entry:

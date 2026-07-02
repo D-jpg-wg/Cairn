@@ -57,7 +57,6 @@ func main() {
 		env = "localhost:9092"
 	}
 
-	fmt.Println(env)
 
 	// 	var wg sync.WaitGroup
 	//

@@ -76,12 +76,14 @@ async def semantic_search(
 @router.get("/", response_model=list[EntryRead], status_code=status.HTTP_200_OK)
 async def get_all_entry(
     q: str | None = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     tag: list[str] | None = Query(None),
     service: EntryService = Depends(get_entry_service),
     owner_id: UUID = Depends(get_current_user_id),
 ) -> list[Entry]:
     """Список записей пользователя с фильтром по тегу и поиском по тексту."""
-    return await service.get_all_entries(owner_id, tag, q)
+    return await service.get_all_entries(owner_id, tag, q, limit, offset)
 
 
 @router.get("/{entry_id}", response_model=EntryRead, status_code=status.HTTP_200_OK)
