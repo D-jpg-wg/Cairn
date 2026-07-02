@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 
 from app.models import Entry, Tag
@@ -21,12 +22,13 @@ class EntryRepository:
         if not names:
             return []
         unique = list(dict.fromkeys(names))  # дедуп, сохраняя порядок
-        existing = await self.session.execute(select(Tag).where(Tag.name.in_(unique)))
-        by_name = {tag.name: tag for tag in existing.scalars().all()}
-        for name in unique:
-            if name not in by_name:
-                by_name[name] = Tag(name=name)
-        return [by_name[name] for name in unique]
+        stmt = pg_insert(Tag).values([{"name": n} for n in unique])
+
+        await self.session.execute(stmt.on_conflict_do_nothing(index_elements=["name"]))
+
+        result = await self.session.execute(select(Tag).where(Tag.name.in_(unique)))
+        by_name = {tag.name: tag for tag in result.scalars().all()}
+        return [by_name[n] for n in unique]
 
     async def get_by_id(self, entry_id: UUID, owner_id: UUID) -> Optional[Entry]:
         """Запись по id в пределах владельца, с подгруженными тегами (или None)."""
