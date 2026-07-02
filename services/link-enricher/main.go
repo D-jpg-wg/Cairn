@@ -20,6 +20,13 @@ type EntryCreated struct {
 	URL     string `json:"url"`
 }
 
+type LinkedEnriched struct {
+	ID     string `json:"id"`
+	URL    string `json:"url"`
+	Status int    `json:"status"`
+	Title  string `json:"title"`
+}
+
 func fetch(url string) (int, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -57,27 +64,6 @@ func main() {
 		env = "localhost:9092"
 	}
 
-
-	// 	var wg sync.WaitGroup
-	//
-	// 	sem := make(chan struct{}, 5)
-	//
-	// 	for _, url := range urls {
-	// 		wg.Add(1)
-	// 		go func() {
-	// 			defer wg.Done()
-	// 			sem <- struct{}{}
-	// 			defer func() { <-sem }()
-	// 			status, title, err := fetch(url)
-	// 			if err != nil {
-	// 				fmt.Println("не смог:", err)
-	// 				return
-	// 			}
-	// 			fmt.Println(status, title)
-	// 		}()
-	// 	}
-	// 	wg.Wait()
-
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{env},
 		Topic:   "entry.created",
@@ -85,6 +71,17 @@ func main() {
 	})
 	defer r.Close()
 	fmt.Println("[link-enricher] слушаю entry.created...")
+
+	w := &kafka.Writer{
+		Addr:                   kafka.TCP(env),
+		Topic:                  "link.enriched",
+		RequiredAcks:           kafka.RequireOne,
+		BatchTimeout:           10 * time.Millisecond,
+		AllowAutoTopicCreation: true,
+	}
+	defer w.Close()
+
+	sem := make(chan struct{}, 5)
 
 	for {
 		msg, err := r.ReadMessage(context.Background())
@@ -103,11 +100,30 @@ func main() {
 		if event.URL == "" {
 			continue
 		}
-		status, title, err := fetch(event.URL)
-		if err != nil {
-			fmt.Println("не смог:", event.URL, err)
-			continue
-		}
-		fmt.Println(status, title)
+		sem <- struct{}{}
+		go func(event EntryCreated) {
+			defer func() { <-sem }()
+			status, title, err := fetch(event.URL)
+			if err != nil {
+				fmt.Println("не смог:", event.URL, err)
+				return
+			}
+			payload, _ := json.Marshal(LinkedEnriched{
+				ID:     event.ID,
+				URL:    event.URL,
+				Status: status,
+				Title:  title,
+			})
+			wctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			err = w.WriteMessages(wctx, kafka.Message{
+				Key:   []byte(event.ID),
+				Value: payload,
+			})
+			cancel()
+			if err != nil {
+				fmt.Println("не отправил:", event.ID, err)
+				return
+			}
+		}(event)
 	}
 }
