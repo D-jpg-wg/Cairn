@@ -161,15 +161,6 @@ services:
       - "50051:50051"
     restart: unless-stopped
 
-  link-enricher:
-    build: ./services/link-enricher
-    depends_on:
-      kafka:
-        condition: service_healthy
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-    restart: unless-stopped
-
   main-api-worker:
     build: ./services/main-api
     depends_on:
