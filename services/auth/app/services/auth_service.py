@@ -1,4 +1,7 @@
 from datetime import datetime, timezone
+from typing import NamedTuple
+from uuid import UUID
+
 from fastapi import HTTPException
 from starlette import status
 
@@ -14,6 +17,12 @@ from app.core.tokens import REFRESH_TTL, LINK_CODE_TTL
 from app.models import User
 from app.repositories.user_repository import AuthRepository
 from app.schemas.user import UserCreate, LoginRequest
+
+
+class IssuedTokens(NamedTuple):
+    access_token: str
+    refresh_token: str
+    user_id: UUID
 
 
 class AuthService:
@@ -62,7 +71,7 @@ class AuthService:
             user = await self.repo.create(email=email)
         return await self.issue_tokens(user)
 
-    async def refresh(self, raw_refresh: str) -> tuple[str, str]:
+    async def refresh(self, raw_refresh: str) -> IssuedTokens:
         """Меняет валидный refresh на новую пару. Старый гасим — это ротация."""
         token = await self.repo.get_refresh_token(hash_refresh_token(raw_refresh))
         if not token or token.revoked or token.expires_at < datetime.now(timezone.utc):
@@ -77,7 +86,7 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User not found",
             )
-        return await self.issue_tokens(user)
+        return IssuedTokens(*await self.issue_tokens(user), user_id=user.uuid)
 
     async def logout(self, raw_refresh: str) -> None:
         token = await self.repo.get_refresh_token(hash_refresh_token(raw_refresh))
@@ -94,8 +103,8 @@ class AuthService:
         )
         return raw
 
-    async def redeem_link_code(self, raw_code: str) -> tuple[str, str]:
-        """меняет валидный код на пару токенов и гасит код (одноразовость)."""
+    async def redeem_link_code(self, raw_code: str) -> IssuedTokens:
+        """Меняет валидный код на пару токенов и гасит код (одноразовость)."""
         link = await self.repo.get_link_code(hash_refresh_token(raw_code))
         if not link or link.used or link.expires_at < datetime.now(timezone.utc):
             raise HTTPException(
@@ -109,4 +118,4 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User not found",
             )
-        return await self.issue_tokens(user)
+        return IssuedTokens(*await self.issue_tokens(user), user_id=user.uuid)

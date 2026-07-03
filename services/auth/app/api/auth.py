@@ -26,6 +26,7 @@ from app.schemas.user import (
     LinkCodeResponse,
     LinkCodeRedeem,
     TokenPairResponse,
+    RefreshRequest,
 )
 from app.services.auth_service import AuthService
 from app.services.google_oauth import GoogleOAuthClient
@@ -115,8 +116,12 @@ async def redeem_link_code(
     service: AuthService = Depends(get_auth_service),
 ):
     """Бот меняет одноразовый код на пару токенов (JSON, not cookie)."""
-    access, refresh = await service.redeem_link_code(body.code)
-    return TokenPairResponse(access_token=access, refresh_token=refresh)
+    tokens = await service.redeem_link_code(body.code)
+    return TokenPairResponse(
+        access_token=tokens.access_token,
+        refresh_token=tokens.refresh_token,
+        user_id=tokens.user_id,
+    )
 
 
 @router.get("/oauth/google")
@@ -165,10 +170,26 @@ async def refresh_tokens(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="No refresh token"
         )
 
-    access, refresh = await service.refresh(raw)
+    tokens = await service.refresh(raw)
     resp = JSONResponse({"ok": True})
-    _set_auth_cookie(resp, access, refresh)
+    _set_auth_cookie(resp, tokens.access_token, tokens.refresh_token)
     return resp
+
+
+@router.post("/token/refresh", response_model=TokenPairResponse)
+@limiter.limit("10/minute")
+async def token_refresh(
+    request: Request,
+    body: RefreshRequest,
+    service: AuthService = Depends(get_auth_service),
+):
+    """JSON-вариант рефреша для машинных клиентов (бот): refresh в теле, пара — в ответе, не в cookie."""
+    tokens = await service.refresh(body.refresh_token)
+    return TokenPairResponse(
+        access_token=tokens.access_token,
+        refresh_token=tokens.refresh_token,
+        user_id=tokens.user_id,
+    )
 
 
 @router.post("/logout")
