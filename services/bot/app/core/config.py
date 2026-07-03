@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     db_host: str
     db_port: str
 
+    telegram_bot_token: str
+    auth_url: str
+    access_ttl: int  # должен быть меньше ACCESS_TTL auth
+
     @property
     def db_url(self) -> str:
         """Async DSN для подключения к Postgres."""
