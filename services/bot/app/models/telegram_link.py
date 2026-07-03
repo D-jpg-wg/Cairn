@@ -11,4 +11,4 @@ class TelegramLink(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID, unique=True, index=True)
-    refresh_token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    refresh_token: Mapped[str] = mapped_column(String(128))
