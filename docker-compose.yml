@@ -85,6 +85,32 @@ services:
       retries: 5
     restart: unless-stopped
 
+  bot:
+    build: ./services/bot
+    depends_on:
+      bot-db:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+      main-api:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    # TELEGRAM_BOT_TOKEN и ACCESS_TTL берём из .env сервиса;
+    # environment ниже переопределяет localhost-значения на compose-сеть.
+    env_file:
+      - ./services/bot/.env
+    environment:
+      DB_HOST: bot-db
+      DB_PORT: 5432
+      DB_NAME: ${BOT_DB_NAME:-cairn_bot}
+      DB_USER: ${BOT_DB_USER:-cairn}
+      DB_PASSWORD: ${BOT_DB_PASSWORD:-cairn}
+      AUTH_URL: http://auth:8000
+      MAIN_API_URL: http://main-api:8000   # внутренний порт, 8001 — это проброс на хост
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092  # изнутри сети — внутренний listener
+    restart: unless-stopped
+
   main-api:
     build: ./services/main-api
     depends_on:

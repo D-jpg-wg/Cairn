@@ -1,7 +1,7 @@
 import uuid
 from typing import cast
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,3 +39,8 @@ class BotRepository:
         stmt = delete(TelegramLink).where(TelegramLink.telegram_id == telegram_id)
         await self.session.execute(stmt)
         await self.session.commit()
+
+    async def get_by_user_id(self, user_id: uuid.UUID) -> TelegramLink | None:
+        stmt = select(TelegramLink).where(TelegramLink.user_id == user_id)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

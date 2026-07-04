@@ -1,0 +1,15 @@
+# Локальное окружение и артефакты — в образ не нужны.
+.venv
+__pycache__/
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Секреты не запекаем в образ: .env прокидывается через compose.
+.env
+
+# Прочее
+tests
+.git
+*.md

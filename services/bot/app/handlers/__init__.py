@@ -1,8 +1,8 @@
 from aiogram import Router
 
-from app.handlers import account, entries, start
+from app.handlers import account, capture, entries, start
 
 router = Router()
-router.include_routers(start.router)
-router.include_routers(account.router)
-router.include_routers(entries.router)
+# capture ловит любой текст (F.text) — подключаем последним,
+# чтобы команды успели совпасть раньше
+router.include_routers(start.router, account.router, entries.router, capture.router)
