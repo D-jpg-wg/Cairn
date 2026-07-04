@@ -2,12 +2,19 @@
 
 Хендлеры зовём напрямую со стабами вместо aiogram-объектов — фильтры и DI
 здесь не проверяются (это территория интеграционного прогона), только логика.
+NotLinkedError хендлеры не ловят — она летит в errors.on_not_linked, поэтому
+для непривязанного юзера тесты ожидают исключение, а ответ юзеру проверяется
+отдельными тестами errors-хендлера.
 """
+
+import pytest
 
 from app.handlers.account import whoami
 from app.handlers.capture import catch_text, on_save
 from app.handlers.entries import cmd_add, cmd_entries, cmd_find, cmd_note
+from app.handlers.errors import on_not_linked
 from app.handlers.start import cmd_start
+from app.services.token_provider import NotLinkedError
 from tests.conftest import FakeCallback, FakeCommand, FakeMessage
 
 TG_ID = 100
@@ -38,9 +45,8 @@ async def test_start_links_account(provider, fake_auth):
 
 
 async def test_whoami_unlinked(provider, auth_http):
-    msg = FakeMessage(TG_ID)
-    await whoami(msg, provider, auth_http)
-    assert any("не привязан" in a for a in msg.answers)
+    with pytest.raises(NotLinkedError):
+        await whoami(FakeMessage(TG_ID), provider, auth_http)
 
 
 async def test_whoami_linked(provider, fake_auth, auth_http):
@@ -92,9 +98,8 @@ async def test_add_usage_hint(provider, main_http):
 
 
 async def test_entries_unlinked(provider, main_http):
-    msg = FakeMessage(TG_ID)
-    await cmd_entries(msg, provider, main_http)
-    assert any("не привязан" in a for a in msg.answers)
+    with pytest.raises(NotLinkedError):
+        await cmd_entries(FakeMessage(TG_ID), provider, main_http)
 
 
 # --- /find ---
@@ -107,9 +112,8 @@ async def test_find_usage_hint(provider, main_http):
 
 
 async def test_find_unlinked(provider, main_http):
-    msg = FakeMessage(TG_ID)
-    await cmd_find(msg, FakeCommand("kafka"), provider, main_http)
-    assert any("не привязан" in a for a in msg.answers)
+    with pytest.raises(NotLinkedError):
+        await cmd_find(FakeMessage(TG_ID), FakeCommand("kafka"), provider, main_http)
 
 
 async def test_find_filters_entries(provider, fake_auth, main_http):
@@ -181,10 +185,10 @@ async def test_save_cancel_deletes_prompt(provider, main_http):
     assert cb.message.deleted
 
 
-async def test_save_unlinked_asks_to_link(provider, main_http):
+async def test_save_unlinked_raises(provider, main_http):
     cb = FakeCallback("save:note", TG_ID, FakeMessage(TG_ID, "x"))
-    await on_save(cb, provider, main_http)
-    assert any("не привязан" in e for e in cb.message.edits)
+    with pytest.raises(NotLinkedError):
+        await on_save(cb, provider, main_http)
 
 
 async def test_save_lost_source_alerts(provider, main_http):
@@ -192,3 +196,29 @@ async def test_save_lost_source_alerts(provider, main_http):
     cb = FakeCallback("save:note", TG_ID, None)
     await on_save(cb, provider, main_http)
     assert any("потерялось" in a for a in cb.alerts)
+
+
+# --- errors-хендлер: единая точка ответа на NotLinkedError ---
+
+
+class FakeUpdate:
+    def __init__(self, message=None, callback_query=None) -> None:
+        self.message = message
+        self.callback_query = callback_query
+
+
+class FakeErrorEvent:
+    def __init__(self, update: FakeUpdate) -> None:
+        self.update = update
+
+
+async def test_error_handler_answers_message():
+    msg = FakeMessage(TG_ID)
+    await on_not_linked(FakeErrorEvent(FakeUpdate(message=msg)))
+    assert any("не привязан" in a for a in msg.answers)
+
+
+async def test_error_handler_alerts_callback():
+    cb = FakeCallback("save:note", TG_ID, None)
+    await on_not_linked(FakeErrorEvent(FakeUpdate(callback_query=cb)))
+    assert any("не привязан" in a for a in cb.alerts)

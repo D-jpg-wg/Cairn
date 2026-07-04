@@ -2,6 +2,7 @@ from aiogram import Router
 from aiogram.filters import CommandObject, CommandStart
 from aiogram.types import Message
 
+from app import texts
 from app.services.token_provider import InvalidCodeError, TokenProvider
 
 
@@ -15,16 +16,14 @@ async def cmd_start(
     token_provider: TokenProvider,
 ) -> None:
     if command.args is None:
-        await message.answer("Привет! Пришли /start <код> — код возьми в веб-версии.")
+        await message.answer(texts.START_HINT)
         return
 
     code = command.args.strip().strip("<>")
     try:
         await token_provider.link(message.from_user.id, code)
     except InvalidCodeError:
-        await message.answer(
-            "Код не подошёл — истёк или уже использован. Возьми новый."
-        )
+        await message.answer(texts.CODE_REJECTED)
         return
 
-    await message.answer("Готово, аккаунт привязан!")
+    await message.answer(texts.LINKED_OK)

@@ -4,7 +4,8 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from app.services.token_provider import NotLinkedError, TokenProvider
+from app.handlers.common import bearer
+from app.services.token_provider import TokenProvider
 
 
 router = Router()
@@ -16,15 +17,7 @@ async def whoami(
     token_provider: TokenProvider,
     auth_http: httpx.AsyncClient,
 ) -> None:
-    try:
-        access = await token_provider.get_access(message.from_user.id)
-    except NotLinkedError:
-        await message.answer(
-            "Аккаунт не привязан. Пришли /start <код> — код возьми в веб-версии."
-        )
-        return
-    resp = await auth_http.get(
-        "/api/v1/auth/me", headers={"Authorization": f"Bearer {access}"}
-    )
+    access = await token_provider.get_access(message.from_user.id)
+    resp = await auth_http.get("/api/v1/auth/me", headers=bearer(access))
     resp.raise_for_status()
     await message.answer(resp.json()["email"])

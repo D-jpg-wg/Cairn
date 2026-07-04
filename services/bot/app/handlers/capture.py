@@ -7,7 +7,9 @@ from aiogram.types import (
 )
 import httpx
 
-from app.services.token_provider import NotLinkedError, TokenProvider
+from app import texts
+from app.handlers.common import ENTRIES_PATH, bearer
+from app.services.token_provider import TokenProvider
 
 router = Router()
 
@@ -27,7 +29,7 @@ async def catch_text(message: Message) -> None:
     """Любой текст без команды — предложение сохранить.
     reply — не косметика: в колбэке исходный текст достаём из reply_to_message.
     """
-    await message.reply("Что сохранить?", reply_markup=KB)
+    await message.reply(texts.WHAT_TO_SAVE, reply_markup=KB)
 
 
 @router.callback_query(F.data.startswith("save:"))
@@ -45,34 +47,23 @@ async def on_save(
     source = callback.message.reply_to_message
     if source is None or source.text is None:
         # Telegram отдаёт reply_to_message только для свежих сообщений
-        await callback.answer("Исходное сообщение потерялось", show_alert=True)
+        await callback.answer(texts.SOURCE_LOST, show_alert=True)
         return
     text = source.text.strip()
 
-    try:
-        # from_user колбэка — тот, кто нажал кнопку;
-        # message.from_user здесь был бы сам бот
-        access = await token_provider.get_access(callback.from_user.id)
-    except NotLinkedError:
-        await callback.message.edit_text(
-            "Аккаунт не привязан. Пришли /start <код> — код возьми в веб-версии."
-        )
-        await callback.answer()
-        return
+    # from_user колбэка — тот, кто нажал кнопку;
+    # message.from_user здесь был бы сам бот
+    access = await token_provider.get_access(callback.from_user.id)
 
     if action == "link":
         payload = {"title": text[:255], "type": "link", "url": text}
     else:
         payload = {"title": text[:255], "type": "note", "content": text}
 
-    resp = await main_http.post(
-        "/api/v1/entries/",
-        json=payload,
-        headers={"Authorization": f"Bearer {access}"},
-    )
+    resp = await main_http.post(ENTRIES_PATH, json=payload, headers=bearer(access))
     if resp.status_code == 422:
-        await callback.answer("Не сохранилось — это точно ссылка?", show_alert=True)
+        await callback.answer(texts.NOT_A_LINK, show_alert=True)
         return
     resp.raise_for_status()
-    await callback.message.edit_text("Сохранил ✅")
+    await callback.message.edit_text(texts.SAVED)
     await callback.answer()

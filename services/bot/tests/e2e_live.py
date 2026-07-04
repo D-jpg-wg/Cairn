@@ -210,14 +210,13 @@ async def main() -> None:
         gone = await BotRepository(session).get_by_telegram_id(TG_ID)
     check("строка удалена из bot-db", gone is None)
 
-    print("== 8. хендлер /whoami без привязки ==")
-    msg = FakeMessage(TG_ID)
-    await whoami(msg, provider, bot_http)  # type: ignore[arg-type]
-    check(
-        "просит /start <код>",
-        any("не привязан" in a for a in msg.answers),
-        str(msg.answers),
-    )
+    print("== 8. хендлер /whoami без привязки -> NotLinkedError ==")
+    # После рефакторинга хендлеры не ловят NotLinkedError — её ловит errors-роутер
+    try:
+        await whoami(FakeMessage(TG_ID), provider, bot_http)  # type: ignore[arg-type]
+        check("NotLinkedError долетела", False, "исключения не было")
+    except NotLinkedError:
+        check("NotLinkedError долетела", True)
 
     print("== 9. хендлер /start: без кода, с мусором, с настоящим кодом ==")
     msg = FakeMessage(TG_ID)
@@ -401,14 +400,13 @@ async def main() -> None:
     await on_save(cb, provider, main_http)  # type: ignore[arg-type]
     check("сообщение с кнопками удалено", cb.message.deleted)
 
-    print("== 22. колбэк от непривязанного юзера ==")
+    print("== 22. колбэк от непривязанного юзера -> NotLinkedError ==")
     cb = FakeCallback("save:note", 111_222, FakeMessageWithText(111_222, "чужой текст"))
-    await on_save(cb, provider, main_http)  # type: ignore[arg-type]
-    check(
-        "просит привязаться",
-        any("не привязан" in e for e in cb.message.edits),
-        str(cb.message.edits),
-    )
+    try:
+        await on_save(cb, provider, main_http)  # type: ignore[arg-type]
+        check("NotLinkedError долетела", False, "исключения не было")
+    except NotLinkedError:
+        check("NotLinkedError долетела", True)
 
     await main_http.aclose()
     await cleanup()

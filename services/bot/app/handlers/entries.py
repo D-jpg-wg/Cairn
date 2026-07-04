@@ -3,11 +3,12 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 import httpx
 
-from app.services.token_provider import NotLinkedError, TokenProvider
+from app import texts
+from app.handlers.common import ENTRIES_PATH, bearer
+from app.services.token_provider import TokenProvider
 
 router = Router()
 
-NOT_LINKED = "Аккаунт не привязан. Пришли /start <код> — код возьми в веб-версии."
 STATUS_ICON = {"pending": "⏳", "ready": "✅", "failed": "⚠️"}
 
 
@@ -31,22 +32,15 @@ async def cmd_entries(
     token_provider: TokenProvider,
     main_http: httpx.AsyncClient,
 ) -> None:
-    try:
-        access = await token_provider.get_access(message.from_user.id)
-    except NotLinkedError:
-        await message.answer(NOT_LINKED)
-        return
+    access = await token_provider.get_access(message.from_user.id)
     resp = await main_http.get(
-        "/api/v1/entries/",
-        params={"limit": 10},
-        headers={"Authorization": f"Bearer {access}"},
+        ENTRIES_PATH, params={"limit": 10}, headers=bearer(access)
     )
     resp.raise_for_status()
     entries = resp.json()
     if not entries:
-        await message.answer("Записей пока нет. Добавь: /add <url> или /note <текст>")
+        await message.answer(texts.NO_ENTRIES)
         return
-
     await message.answer(_render(entries), disable_web_page_preview=True)
 
 
@@ -58,23 +52,18 @@ async def cmd_find(
     main_http: httpx.AsyncClient,
 ) -> None:
     if command.args is None:
-        await message.answer("Так: /find <что ищем>")
+        await message.answer(texts.USAGE_FIND)
         return
-    try:
-        access = await token_provider.get_access(message.from_user.id)
-    except NotLinkedError:
-        await message.answer(NOT_LINKED)
-        return
-
+    access = await token_provider.get_access(message.from_user.id)
     resp = await main_http.get(
-        "/api/v1/entries/",
+        ENTRIES_PATH,
         params={"q": command.args.strip(), "limit": 10},
-        headers={"Authorization": f"Bearer {access}"},
+        headers=bearer(access),
     )
     resp.raise_for_status()
     entries = resp.json()
     if not entries:
-        await message.answer("Ничего не нашлось 🤷")
+        await message.answer(texts.NOT_FOUND)
         return
     await message.answer(_render(entries), disable_web_page_preview=True)
 
@@ -87,25 +76,20 @@ async def cmd_add(
     main_http: httpx.AsyncClient,
 ) -> None:
     if command.args is None:
-        await message.answer("Так: /add <url>")
+        await message.answer(texts.USAGE_ADD)
         return
-    try:
-        access = await token_provider.get_access(message.from_user.id)
-    except NotLinkedError:
-        await message.answer(NOT_LINKED)
-        return
-
+    access = await token_provider.get_access(message.from_user.id)
     url = command.args.strip()
     resp = await main_http.post(
-        "/api/v1/entries/",
+        ENTRIES_PATH,
         json={"title": url[:255], "type": "link", "url": url},
-        headers={"Authorization": f"Bearer {access}"},
+        headers=bearer(access),
     )
     if resp.status_code == 422:
-        await message.answer("Это не похоже на ссылку.")
+        await message.answer(texts.NOT_A_LINK)
         return
     resp.raise_for_status()
-    await message.answer("Добавил 🔗 — обрабатывается, статус смотри в /entries")
+    await message.answer(texts.ADDED_LINK)
 
 
 @router.message(Command("note"))
@@ -116,22 +100,17 @@ async def cmd_note(
     main_http: httpx.AsyncClient,
 ) -> None:
     if command.args is None:
-        await message.answer("Так: /note <текст заметки>")
+        await message.answer(texts.USAGE_NOTE)
         return
-    try:
-        access = await token_provider.get_access(message.from_user.id)
-    except NotLinkedError:
-        await message.answer(NOT_LINKED)
-        return
-
+    access = await token_provider.get_access(message.from_user.id)
     text = command.args.strip()
     resp = await main_http.post(
-        "/api/v1/entries/",
+        ENTRIES_PATH,
         json={"title": text[:255], "type": "note", "content": text},
-        headers={"Authorization": f"Bearer {access}"},
+        headers=bearer(access),
     )
     if resp.status_code == 422:
-        await message.answer("Не получилось сохранить заметку.")
+        await message.answer(texts.NOTE_FAILED)
         return
     resp.raise_for_status()
-    await message.answer("Записал 📝")
+    await message.answer(texts.ADDED_NOTE)

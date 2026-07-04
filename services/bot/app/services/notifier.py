@@ -5,6 +5,7 @@ from aiogram import Bot
 from aiokafka import AIOKafkaConsumer
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app import texts
 from app.core.config import setting
 from app.repositories.bot_repository import BotRepository
 
@@ -37,7 +38,7 @@ async def run_notifier(
                     continue
 
             icon = TYPE_ICON.get(event["type"], "•")
-            text = f"{icon} В базу добавлена запись"
+            text = f"{icon} {texts.NEW_ENTRY}"
             if event.get("url"):
                 text += f"\n{event['url']}"
             try:
