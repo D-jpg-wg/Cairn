@@ -61,7 +61,7 @@ jobs:
           openssl rsa -pubout -in keys/jwt_private.pem -out keys/jwt_public.pem
 
       - run: uv sync
-      - run: uv run pytest
+      - run: uv run pytest --cov=app --cov-report=term
 
   build:
     needs: [changes, test]

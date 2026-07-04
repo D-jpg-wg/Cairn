@@ -1,6 +1,9 @@
 # Cairn
 
 [![CI](https://github.com/D-jpg-wg/Cairn/actions/workflows/ci.yml/badge.svg)](https://github.com/D-jpg-wg/Cairn/actions/workflows/ci.yml)
+[![coverage: auth](https://img.shields.io/badge/coverage%20auth-93%25-brightgreen)](#покрытие-тестами)
+[![coverage: main-api](https://img.shields.io/badge/coverage%20main--api-86%25-green)](#покрытие-тестами)
+[![coverage: bot](https://img.shields.io/badge/coverage%20bot-78%25-yellowgreen)](#покрытие-тестами)
 [![Python 3.14](https://img.shields.io/badge/python-3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -167,6 +170,27 @@ uv add "fastapi[standard]"             # добавить зависимость
 в `.proto` — это контракт на проводе: новые поля добавлять можно, переиспользовать
 или удалять старый номер — нельзя. На каждый gRPC-вызов ставится deadline,
 обработчики идемпотентны (ретраи могут прислать вызов дважды).
+
+## Покрытие тестами
+
+Coverage считается per-service (у каждого сервиса свои тесты и своё окружение):
+
+```bash
+cd services/<name>
+uv run pytest --cov=app --cov-report=term-missing   # с построчным списком дыр
+```
+
+Текущие цифры (плашки выше обновляются вручную — живой бейдж потребовал бы
+Codecov или аналог):
+
+| Сервис | Покрытие | Что не покрыто и почему |
+|--------|----------|------------------------|
+| `auth` | 93% | `google_oauth.py` (48%) — внешний OAuth-флоу, руками через браузер |
+| `main-api` | 86% | Kafka/gRPC-обвязка — живая шина, проверяется e2e |
+| `bot` | 78% | `main.py`, `notifier.py`, `config.py` — composition root и Kafka-консьюмер, покрываются только живым `tests/e2e_live.py` против compose-стека |
+| `search` | — | заглушка, тестов нет |
+
+В CI тесты идут с `--cov` — процент виден в логах джобы `test` каждого сервиса.
 
 ## Pre-commit
 

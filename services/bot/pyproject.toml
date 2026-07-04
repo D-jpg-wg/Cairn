@@ -17,6 +17,7 @@ dev = [
     "psycopg2-binary>=2.9.9",
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
+    "pytest-cov>=7.1.0",
     "testcontainers>=4.8.0",
 ]
 
