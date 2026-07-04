@@ -22,6 +22,9 @@ jobs:
             main-api:
               - 'services/main-api/**'
               - '.github/workflows/ci.yml'
+            bot:
+              - 'services/bot/**'
+              - '.github/workflows/ci.yml'
   lint:
     runs-on: ubuntu-latest
     steps:

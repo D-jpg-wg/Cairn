@@ -17,9 +17,9 @@ async def seed_link(session_factory, user_id: str, refresh: str) -> None:
         await BotRepository(session).upsert(TG_ID, uuid.UUID(user_id), refresh)
 
 
-async def get_link(session_factory):
+async def get_link(session_factory, tg_id: int = TG_ID):
     async with session_factory() as session:
-        return await BotRepository(session).get_by_telegram_id(TG_ID)
+        return await BotRepository(session).get_by_telegram_id(tg_id)
 
 
 async def test_remember_serves_from_cache(provider, fake_auth):
@@ -106,6 +106,45 @@ async def test_link_code_is_single_use(provider, fake_auth):
 async def test_link_invalid_code(provider):
     with pytest.raises(InvalidCodeError):
         await provider.link(TG_ID, "garbage")
+
+
+async def test_relink_moves_link_to_new_chat(provider, fake_auth, session_factory):
+    """Тот же аккаунт из другого чата: старая привязка снесена, кэш выбит."""
+    await provider.link(TG_ID, fake_auth.issue_code())
+    other_tg = 200
+
+    old = await provider.link(other_tg, fake_auth.issue_code())
+
+    assert old == TG_ID
+    assert await get_link(session_factory, TG_ID) is None
+    assert (await get_link(session_factory, other_tg)) is not None
+    with pytest.raises(NotLinkedError):  # кэш старого чата не пережил перепривязку
+        await provider.get_access(TG_ID)
+
+
+async def test_relink_same_chat_returns_none(provider, fake_auth, session_factory):
+    """Повторный /start из того же чата — не «вытеснение», уведомлять некого."""
+    await provider.link(TG_ID, fake_auth.issue_code())
+
+    old = await provider.link(TG_ID, fake_auth.issue_code())
+
+    assert old is None
+    assert (await get_link(session_factory)) is not None
+
+
+async def test_repo_replace_link_chat_switches_account(session_factory, fake_auth):
+    """Чат был привязан к одному аккаунту, привязывается к другому:
+    конфликт по PK telegram_id, его решает upsert-часть replace_link."""
+    user_b = uuid.uuid4()
+    await seed_link(session_factory, fake_auth.user_id, "r1")
+
+    async with session_factory() as session:
+        old = await BotRepository(session).replace_link(TG_ID, user_b, "r2")
+
+    assert old is None  # user_b раньше нигде привязан не был
+    link = await get_link(session_factory)
+    assert link.user_id == user_b
+    assert link.refresh_token == "r2"
 
 
 async def test_repo_upsert_updates_on_conflict(session_factory, fake_auth):

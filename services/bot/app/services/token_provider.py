@@ -88,7 +88,7 @@ class TokenProvider:
         self.remember(telegram_id, body["access_token"])
         return body["access_token"]
 
-    async def link(self, telegram_id: int, code: str) -> None:
+    async def link(self, telegram_id: int, code: str) -> int | None:
         """Погасить код привязки: redeem в auth → refresh в БД → access в кэш."""
         resp = await self.http.post(
             "/api/v1/auth/link-code/redeem", json={"code": code}
@@ -99,8 +99,12 @@ class TokenProvider:
 
         async with self.session_factory() as session:
             repo = BotRepository(session)
-            await repo.upsert(
+            old_telegram_id = await repo.replace_link(
                 telegram_id, uuid.UUID(body["user_id"]), body["refresh_token"]
             )
+        if old_telegram_id is not None:
+            self._cache.pop(old_telegram_id, None)
 
         self.remember(telegram_id, body["access_token"])
+
+        return old_telegram_id

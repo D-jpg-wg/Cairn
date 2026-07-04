@@ -44,3 +44,39 @@ class BotRepository:
         stmt = select(TelegramLink).where(TelegramLink.user_id == user_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def replace_link(
+        self,
+        telegram_id: int,
+        user_id: uuid.UUID,
+        refresh_token: str,
+    ) -> int | None:
+        """Привязывает user_id к telegram_id, снося его привязку к другому аккаунту.
+        Возвращает telegram_id старой привязки (уведомить владельца) или None.
+        Оба действия — в одной транзакции: между «удалил старую» и «записал
+        новую» нет окна, где юзер остался без привязки вовсе.
+        """
+        stmt = (
+            delete(TelegramLink)
+            .where(
+                TelegramLink.user_id == user_id,
+                TelegramLink.telegram_id != telegram_id,
+            )
+            .returning(TelegramLink.telegram_id)
+        )
+        result = await self.session.execute(stmt)
+        old_telegram_id = result.scalar_one_or_none()
+
+        ins = insert(TelegramLink).values(
+            telegram_id=telegram_id, user_id=user_id, refresh_token=refresh_token
+        )
+        ins = ins.on_conflict_do_update(
+            index_elements=[TelegramLink.telegram_id],
+            set_={
+                "user_id": ins.excluded.user_id,
+                "refresh_token": ins.excluded.refresh_token,
+            },
+        )
+        await self.session.execute(ins)
+        await self.session.commit()
+        return old_telegram_id

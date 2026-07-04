@@ -9,6 +9,7 @@ NotLinkedError хендлеры не ловят — она летит в errors.
 
 import pytest
 
+from app import texts
 from app.handlers.account import whoami
 from app.handlers.capture import catch_text, on_save
 from app.handlers.entries import cmd_add, cmd_entries, cmd_find, cmd_note
@@ -38,6 +39,28 @@ async def test_start_bad_code(provider):
 async def test_start_links_account(provider, fake_auth):
     msg = FakeMessage(TG_ID)
     await cmd_start(msg, FakeCommand(f"<{fake_auth.issue_code()}>"), provider)
+    assert any("привязан" in a for a in msg.answers)
+    assert msg.bot.sent == []  # вытеснять было некого
+
+
+async def test_start_relink_notifies_old_chat(provider, fake_auth):
+    await provider.link(TG_ID, fake_auth.issue_code())
+    msg = FakeMessage(200)
+
+    await cmd_start(msg, FakeCommand(fake_auth.issue_code()), provider)
+
+    assert any("привязан" in a for a in msg.answers)
+    assert msg.bot.sent == [(TG_ID, texts.LINK_MOVED)]
+
+
+async def test_start_relink_survives_blocked_old_chat(provider, fake_auth):
+    """Старый чат заблокировал бота — привязка всё равно успешна."""
+    await provider.link(TG_ID, fake_auth.issue_code())
+    msg = FakeMessage(200)
+    msg.bot.fail = True
+
+    await cmd_start(msg, FakeCommand(fake_auth.issue_code()), provider)
+
     assert any("привязан" in a for a in msg.answers)
 
 

@@ -1,3 +1,6 @@
+from contextlib import suppress
+
+from aiogram.exceptions import TelegramAPIError
 from aiogram import Router
 from aiogram.filters import CommandObject, CommandStart
 from aiogram.types import Message
@@ -21,9 +24,13 @@ async def cmd_start(
 
     code = command.args.strip().strip("<>")
     try:
-        await token_provider.link(message.from_user.id, code)
+        old_telegram_id = await token_provider.link(message.from_user.id, code)
     except InvalidCodeError:
         await message.answer(texts.CODE_REJECTED)
         return
 
     await message.answer(texts.LINKED_OK)
+
+    if old_telegram_id is not None:
+        with suppress(TelegramAPIError):
+            await message.bot.send_message(old_telegram_id, texts.LINK_MOVED)

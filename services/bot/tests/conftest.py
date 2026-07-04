@@ -28,6 +28,7 @@ os.environ.update(
 import httpx  # noqa: E402
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
+from aiogram.exceptions import TelegramForbiddenError  # noqa: E402
 from sqlalchemy.ext.asyncio import (  # noqa: E402
     AsyncEngine,
     async_sessionmaker,
@@ -205,11 +206,30 @@ class FakeUser:
         self.id = tg_id
 
 
+class FakeBot:
+    """bot.send_message — так cmd_start уведомляет вытесненный чат.
+
+    fail=True имитирует чат, заблокировавший бота: Telegram отвечает 403.
+    """
+
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+        self.sent: list[tuple[int, str]] = []
+
+    async def send_message(self, chat_id: int, text: str, **kwargs) -> None:
+        if self.fail:
+            raise TelegramForbiddenError(
+                method=None, message="bot was blocked by the user"
+            )
+        self.sent.append((chat_id, text))
+
+
 class FakeMessage:
     def __init__(self, tg_id: int, text: str | None = None) -> None:
         self.from_user = FakeUser(tg_id)
         self.text = text
         self.answers: list[str] = []
+        self.bot = FakeBot()
 
     async def answer(self, text: str, **kwargs) -> None:
         self.answers.append(text)
