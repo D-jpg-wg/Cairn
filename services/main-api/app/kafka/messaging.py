@@ -20,7 +20,11 @@ async def stop_producer() -> None:
 
 
 async def publish_event(topic: str, key: str, value: dict) -> None:
-    """Шлёт событие в топик и ждёт подтверждения брокера (send_and_wait)."""
+    """Кладёт событие в батч продюсера, не дожидаясь ack брокера.
+
+    Размен: запрос не платит ~20 мс за подтверждение, но при падении брокера
+    событие может потеряться — ошибка доставки всплывёт только в логах.
+    """
     if _producer is None:
         raise RuntimeError("Kafka producer not started.")
     await _producer.send(
