@@ -14,12 +14,16 @@ async def main() -> None:
     dp = Dispatcher()
     dp.include_routers(handlers.router)
     http = httpx.AsyncClient(base_url=setting.auth_url, timeout=5)
+    main_http = httpx.AsyncClient(base_url=setting.main_api_url, timeout=5)
     provider = TokenProvider(http, async_session, setting.access_ttl)
 
     try:
-        await dp.start_polling(bot, token_provider=provider, auth_http=http)
+        await dp.start_polling(
+            bot, token_provider=provider, auth_http=http, main_http=main_http
+        )
     finally:
         await http.aclose()
+        await main_http.aclose()
         await engine.dispose()
 
 

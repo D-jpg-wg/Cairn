@@ -12,6 +12,8 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str
     auth_url: str
+    main_api_url: str
+    kafka_bootstrap_servers: str
     access_ttl: int  # должен быть меньше ACCESS_TTL auth
 
     @property
