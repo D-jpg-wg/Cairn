@@ -12,6 +12,7 @@ dependencies = [
     "greenlet>=3.5.2",
     "grpcio>=1.81.1",
     "httpx>=0.28.1",
+    "orjson>=3.11.9",
     "protobuf>=7.35.1",
     "psycopg2-binary>=2.9.12",
     "pydantic-settings>=2.14.2",

@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import ORJSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import entries_router, health_router, me_router
@@ -26,7 +27,11 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     """Собирает приложение: роуты и раздача статики."""
-    app = FastAPI(title=setting.app_name, lifespan=lifespan)
+    app = FastAPI(
+        title=setting.app_name,
+        lifespan=lifespan,
+        default_response_class=ORJSONResponse,
+    )
 
     app.include_router(entries_router, prefix="/api/v1/entries", tags=["entries"])
     app.include_router(health_router, prefix="/api/v1", tags=["health"])
