@@ -136,10 +136,12 @@ docker compose up --build      # все сервисы + postgres / kafka / redi
 | `main-api` | http://localhost:8001 | ядро, бизнес-логика (Swagger на `/docs`) |
 | `search` | `localhost:50051` | gRPC-сервис (заглушка) |
 | `kafka-ui` | http://localhost:8080 | веб-просмотр топиков Kafka |
+| `bot` | — | Telegram-бот (long-polling, входящих портов нет) |
 | `auth-db` | `localhost:5432` | Postgres сервиса auth |
 | `main-db` | `localhost:5433` | Postgres сервиса main-api |
+| `bot-db` | `localhost:5434` | Postgres сервиса bot |
 | `redis` | `localhost:6379` | брокер Celery + кэш |
-| `kafka` | `localhost:9092` | шина событий |
+| `kafka` | `localhost:29092` с хоста, `kafka:9092` изнутри сети | шина событий |
 
 Рядом с `main-api` поднимаются `main-api-worker` (Celery worker) и
 `main-api-beat` (Celery beat) из того же образа.

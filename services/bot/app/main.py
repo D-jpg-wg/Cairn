@@ -27,6 +27,7 @@ async def main() -> None:
             BotCommand(command="add", description="Сохранить ссылку"),
             BotCommand(command="note", description="Быстрая заметка"),
             BotCommand(command="whoami", description="Кто я"),
+            BotCommand(command="find", description="Поиск по записям"),
         ]
     )
 

@@ -157,7 +157,9 @@ services:
   kafka:
     image: apache/kafka:3.9.0
     ports:
-      - "9092:9092"
+      # Изнутри compose-сети клиенты ходят на kafka:9092 без проброса.
+      # Наружу — только EXTERNAL-listener: брокер представляется как
+      # localhost:29092, иначе хостовый клиент упрётся в неразрешимое kafka:9092.
       - "29092:29092"
     environment:
       KAFKA_NODE_ID: 1

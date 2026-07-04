@@ -132,7 +132,16 @@ class FakeMainApi:
             return httpx.Response(401, json={"detail": "Not authenticated"})
 
         if request.method == "GET":
-            return httpx.Response(200, json=self.entries)
+            # Повторяем контракт main-api: ?q= фильтрует по title/content
+            q = request.url.params.get("q")
+            found = [
+                e
+                for e in self.entries
+                if q is None
+                or q.lower() in e["title"].lower()
+                or q.lower() in (e["content"] or "").lower()
+            ]
+            return httpx.Response(200, json=found)
 
         import json
 

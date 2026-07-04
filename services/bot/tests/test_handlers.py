@@ -6,7 +6,7 @@
 
 from app.handlers.account import whoami
 from app.handlers.capture import catch_text, on_save
-from app.handlers.entries import cmd_add, cmd_entries, cmd_note
+from app.handlers.entries import cmd_add, cmd_entries, cmd_find, cmd_note
 from app.handlers.start import cmd_start
 from tests.conftest import FakeCallback, FakeCommand, FakeMessage
 
@@ -95,6 +95,60 @@ async def test_entries_unlinked(provider, main_http):
     msg = FakeMessage(TG_ID)
     await cmd_entries(msg, provider, main_http)
     assert any("не привязан" in a for a in msg.answers)
+
+
+# --- /find ---
+
+
+async def test_find_usage_hint(provider, main_http):
+    msg = FakeMessage(TG_ID)
+    await cmd_find(msg, FakeCommand(None), provider, main_http)
+    assert any("Так:" in a for a in msg.answers)
+
+
+async def test_find_unlinked(provider, main_http):
+    msg = FakeMessage(TG_ID)
+    await cmd_find(msg, FakeCommand("kafka"), provider, main_http)
+    assert any("не привязан" in a for a in msg.answers)
+
+
+async def test_find_filters_entries(provider, fake_auth, main_http):
+    await linked(provider, fake_auth)
+    await cmd_note(
+        FakeMessage(TG_ID), FakeCommand("заметка про kafka"), provider, main_http
+    )
+    await cmd_note(
+        FakeMessage(TG_ID), FakeCommand("заметка про grpc"), provider, main_http
+    )
+
+    msg = FakeMessage(TG_ID)
+    await cmd_find(msg, FakeCommand("kafka"), provider, main_http)
+
+    text = "\n".join(msg.answers)
+    assert "про kafka" in text
+    assert "grpc" not in text  # главный assert: поиск, а не «показать всё»
+
+
+async def test_find_no_matches(provider, fake_auth, main_http):
+    await linked(provider, fake_auth)
+    await cmd_note(
+        FakeMessage(TG_ID), FakeCommand("заметка про kafka"), provider, main_http
+    )
+
+    msg = FakeMessage(TG_ID)
+    await cmd_find(msg, FakeCommand("такого-нет"), provider, main_http)
+    assert any("не нашлось" in a for a in msg.answers)
+
+
+async def test_render_dedups_title_equal_url(provider, fake_auth, main_http):
+    """title == url (как делает /add) — ссылка в выводе не дублируется."""
+    await linked(provider, fake_auth)
+    url = "https://example.com/dedup"
+    await cmd_add(FakeMessage(TG_ID), FakeCommand(url), provider, main_http)
+
+    msg = FakeMessage(TG_ID)
+    await cmd_entries(msg, provider, main_http)
+    assert "\n".join(msg.answers).count(url) == 1
 
 
 # --- capture: текст + inline-кнопки ---

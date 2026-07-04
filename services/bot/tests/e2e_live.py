@@ -2,6 +2,9 @@
 
 В отличие от tests/test_* (офлайн, свой Postgres) требует поднятый compose-стек:
     docker compose up -d auth main-api bot-db kafka
+Перед запуском останови бота в compose: docker compose stop bot.
+Иначе два конфликта: его консьюмер в той же группе bot-notifier перехватит
+событие теста 16, а привязка тестового юзера будет мигать в общей bot-db.
 Запуск из services/bot:
     PYTHONPATH=. .venv/bin/python tests/e2e_live.py
 Имя без test_-префикса намеренно: pytest его не собирает.

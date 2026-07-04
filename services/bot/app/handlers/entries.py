@@ -11,6 +11,20 @@ NOT_LINKED = "Аккаунт не привязан. Пришли /start <код>
 STATUS_ICON = {"pending": "⏳", "ready": "✅", "failed": "⚠️"}
 
 
+def _render(entries: list[dict]) -> str:
+    lines = []
+    for entry in entries:
+        icon = STATUS_ICON.get(entry["status"], "•")
+        title = entry["title"][:60]
+        extra = (
+            f"\n   {entry['url']}"
+            if entry["url"] and entry["url"] != entry["title"]
+            else ""
+        )
+        lines.append(f"{icon} {title}{extra}")
+    return "\n".join(lines)
+
+
 @router.message(Command("entries"))
 async def cmd_entries(
     message: Message,
@@ -33,17 +47,36 @@ async def cmd_entries(
         await message.answer("Записей пока нет. Добавь: /add <url> или /note <текст>")
         return
 
-    lines = []
-    for entry in entries:
-        icon = STATUS_ICON.get(entry["status"], "•")
-        title = entry["title"][:60]
-        extra = (
-            f"\n   {entry['url']}"
-            if entry["url"] and entry["url"] != entry["title"]
-            else ""
-        )
-        lines.append(f"{icon} {title}{extra}")
-    await message.answer("\n".join(lines), disable_web_page_preview=True)
+    await message.answer(_render(entries), disable_web_page_preview=True)
+
+
+@router.message(Command("find"))
+async def cmd_find(
+    message: Message,
+    command: CommandObject,
+    token_provider: TokenProvider,
+    main_http: httpx.AsyncClient,
+) -> None:
+    if command.args is None:
+        await message.answer("Так: /find <что ищем>")
+        return
+    try:
+        access = await token_provider.get_access(message.from_user.id)
+    except NotLinkedError:
+        await message.answer(NOT_LINKED)
+        return
+
+    resp = await main_http.get(
+        "/api/v1/entries/",
+        params={"q": command.args.strip(), "limit": 10},
+        headers={"Authorization": f"Bearer {access}"},
+    )
+    resp.raise_for_status()
+    entries = resp.json()
+    if not entries:
+        await message.answer("Ничего не нашлось 🤷")
+        return
+    await message.answer(_render(entries), disable_web_page_preview=True)
 
 
 @router.message(Command("add"))
@@ -53,7 +86,6 @@ async def cmd_add(
     token_provider: TokenProvider,
     main_http: httpx.AsyncClient,
 ) -> None:
-
     if command.args is None:
         await message.answer("Так: /add <url>")
         return
