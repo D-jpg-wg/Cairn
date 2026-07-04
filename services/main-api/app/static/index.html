@@ -145,6 +145,15 @@
       display: none; align-items: center; justify-content: center; padding: 20px; z-index: 40;
     }
     .overlay.show { display: flex; }
+
+    /* ---------- Привязка Telegram-бота ---------- */
+    .bot-hint { color: var(--muted); font-size: 13.5px; margin: 0 0 12px; }
+    .bot-code {
+      padding: 14px; background: #0f1222; border: 1px dashed var(--accent);
+      border-radius: 11px; font-family: ui-monospace, "SF Mono", monospace;
+      font-size: 13.5px; word-break: break-all; text-align: center;
+    }
+    .bot-meta { color: var(--muted); font-size: 12px; text-align: center; margin-top: 8px; }
     .modal {
       width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
       background: linear-gradient(180deg, var(--card), var(--card-2));
@@ -250,6 +259,9 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
         Новая запись
       </button>
+      <button class="btn icon" id="bot-btn" title="Привязать Telegram-бота">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+      </button>
       <div class="user-pill"><span class="dot"></span><span id="user-id"></span></div>
       <button class="btn icon danger" id="logout-btn" title="Выйти">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>
@@ -311,6 +323,20 @@
   <!-- детальный просмотр одной записи -->
   <div class="overlay" id="detail-overlay">
     <div class="modal" id="detail-modal"></div>
+  </div>
+
+  <!-- модалка привязки Telegram-бота -->
+  <div class="overlay" id="bot-overlay">
+    <div class="modal">
+      <h3>Привязка Telegram-бота</h3>
+      <p class="bot-hint">Отправь боту эту команду — код одноразовый:</p>
+      <div class="bot-code" id="bot-code"></div>
+      <div class="bot-meta">истечёт через <span id="bot-ttl">5:00</span></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="bot-close">Закрыть</button>
+        <button type="button" class="btn primary" id="bot-copy">Скопировать</button>
+      </div>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -608,6 +634,40 @@
     $("entry-form").addEventListener("submit", submitEntry);
     $("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) closeModal(); });
     $("detail-overlay").addEventListener("click", (e) => { if (e.target === $("detail-overlay")) closeDetail(); });
+    // Привязка бота: код выдаёт auth — cross-origin с cookie, CORS в auth
+    // разрешает этот origin (тот же паттерн, что /refresh и /logout).
+    let botTtlTimer;
+    function closeBotModal() { clearInterval(botTtlTimer); $("bot-overlay").classList.remove("show"); }
+    $("bot-btn").addEventListener("click", async () => {
+      let res = await fetch(AUTH_URL + "api/v1/auth/link-code", { method: "POST", credentials: "include" });
+      if (res.status === 401) {
+        // access истёк — молча обновляем и повторяем один раз
+        const r = await fetch(AUTH_URL + "api/v1/auth/refresh", { method: "POST", credentials: "include" });
+        if (r.ok) res = await fetch(AUTH_URL + "api/v1/auth/link-code", { method: "POST", credentials: "include" });
+      }
+      if (!res.ok) {
+        toast(res.status === 429 ? "Слишком часто — подожди минуту" : "Не удалось получить код", true);
+        return;
+      }
+      const { code } = await res.json();
+      $("bot-code").textContent = "/start " + code;
+      $("bot-overlay").classList.add("show");
+      clearInterval(botTtlTimer);
+      let left = 5 * 60;   // TTL кода на стороне auth
+      const tick = () => {
+        $("bot-ttl").textContent = Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0");
+        if (left-- <= 0) closeBotModal();
+      };
+      tick();
+      botTtlTimer = setInterval(tick, 1000);
+    });
+    $("bot-close").addEventListener("click", closeBotModal);
+    $("bot-overlay").addEventListener("click", (e) => { if (e.target === $("bot-overlay")) closeBotModal(); });
+    $("bot-copy").addEventListener("click", async () => {
+      await navigator.clipboard.writeText($("bot-code").textContent);
+      toast("Скопировано — вставь боту в Telegram");
+    });
+
     $("logout-btn").addEventListener("click", async () => {
       if (es) es.close();        // закрыть SSE перед выходом
       // Выход на стороне auth: отзывает refresh в БД и чистит обе cookie.
@@ -636,7 +696,7 @@
       searchTimer = setTimeout(() => { state.q = e.target.value.trim(); loadEntries(); }, 280);
     });
 
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); closeDetail(); } });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); closeDetail(); closeBotModal(); } });
 
     // ---------- init ----------
     (async function init() {

@@ -1,4 +1,5 @@
 import uuid
+from typing import cast
 
 from sqlalchemy import delete
 from sqlalchemy.dialects.postgresql import insert
@@ -14,8 +15,9 @@ class BotRepository:
         self.session = session
 
     async def get_by_telegram_id(self, telegram_id: int) -> TelegramLink | None:
-        # noinspection PyTypeChecker
-        return await self.session.get(TelegramLink, telegram_id)
+        return cast(
+            TelegramLink | None, await self.session.get(TelegramLink, telegram_id)
+        )
 
     async def upsert(
         self, telegram_id: int, user_id: uuid.UUID, refresh_token: str

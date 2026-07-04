@@ -14,6 +14,12 @@ class NotLinkedError(Exception):
     pass
 
 
+class InvalidCodeError(Exception):
+    """Код истёк или уже использован."""
+
+    pass
+
+
 class TokenProvider:
     """Выдаёт валидный access-токен для telegram_id.
     Кэш access в памяти, refresh в БД; ротация refresh и отвязка по 401 — внутри,
@@ -81,3 +87,20 @@ class TokenProvider:
             )
         self.remember(telegram_id, body["access_token"])
         return body["access_token"]
+
+    async def link(self, telegram_id: int, code: str) -> None:
+        """Погасить код привязки: redeem в auth → refresh в БД → access в кэш."""
+        resp = await self.http.post(
+            "/api/v1/auth/link-code/redeem", json={"code": code}
+        )
+        if resp.status_code != 200:
+            raise InvalidCodeError
+        body = resp.json()
+
+        async with self.session_factory() as session:
+            repo = BotRepository(session)
+            await repo.upsert(
+                telegram_id, uuid.UUID(body["user_id"]), body["refresh_token"]
+            )
+
+        self.remember(telegram_id, body["access_token"])
