@@ -192,6 +192,43 @@ Codecov или аналог):
 
 В CI тесты идут с `--cov` — процент виден в логах джобы `test` каждого сервиса.
 
+## Нагрузочное тестирование
+
+Сценарии лежат в [`infra/load/`](./infra/load/): Locust-профили на каждый сервис
+отдельно и сквозной «живой пользователь» (auth + main-api + search разом), плюс
+прямой gRPC-бенч заглушки search. Запуск против локального compose-стека:
+
+```bash
+export LOAD_ACCESS=$(infra/load/get_token.sh)   # регистрирует load-юзера, отдаёт JWT
+uvx locust -f infra/load/locustfile.py AuthMe      --headless -u 20 -r 10 -t 30s -H http://localhost:8000
+uvx locust -f infra/load/locustfile.py MainApi     --headless -u 20 -r 10 -t 30s -H http://localhost:8001
+uvx locust -f infra/load/locustfile.py UserJourney --headless -u 20 -r 10 -t 30s -H http://localhost:8001
+cd services/main-api && uv run python ../../infra/load/bench_search.py
+```
+
+Результаты (MacBook Pro, весь стек в Docker Compose, 20 виртуальных юзеров,
+30 c на профиль; один uvicorn-воркер на сервис — это baseline, не потолок):
+
+| Профиль | RPS | p50 | p95 | Ошибки |
+|---------|-----|-----|-----|--------|
+| auth: `GET /me` (JWT + чтение БД) | 1 231 | 13 мс | 32 мс | 0 |
+| main-api: `GET /entries/` | 413 | 29 мс | 37 мс | 0 |
+| main-api: `POST /entries/` (INSERT + Kafka) | 139 | 52 мс | 64 мс | 0 |
+| сквозной (auth + main-api + search, 5 операций) | 693 | 32 мс | 61 мс | 0 из 20 671 |
+| search: gRPC `Search` напрямую | 8 237 | 2.4 мс | 2.9 мс | 0 |
+
+Что важно понимать про эти цифры:
+
+- **`/login` нагрузке не поддаётся сознательно** — лимитер 5/мин с IP; токен
+  для сценариев берётся одним логином в `get_token.sh`.
+- **search — заглушка**: 8 тыс. rps — это скорость каркаса `grpc.aio` без
+  реальной работы; после появления embeddings цифра станет честной.
+- **Фон выдержал**: за сквозной прогон main-api опубликовал ~6 тыс.
+  `entry.created` в Kafka, `bot`-консьюмер переварил их без ошибок (load-юзер
+  не привязан к Telegram — уведомления не шлются, событие просто пропускается).
+- Load-юзер `loadtest@cairn.dev` изолирован: его записи не видны другим и при
+  желании чистятся одним `DELETE` по owner_id.
+
 ## Pre-commit
 
 Хуки гигиены и ruff ставятся отдельно от окружений сервисов:
