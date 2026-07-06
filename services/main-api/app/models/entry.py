@@ -13,6 +13,8 @@ from sqlalchemy import (
     Text,
     UUID,
     func,
+    Index,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -67,6 +69,15 @@ entry_tags = Table(
 
 class Entry(Base):
     __tablename__ = "entries"
+    __table_args__ = (
+        Index(
+            "uq_entries_owner_url",
+            "owner_id",
+            "url",
+            unique=True,
+            postgresql_where=text("url IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     # Логическая ссылка на пользователя из auth-сервиса — без FK (другая БД).

@@ -1,4 +1,5 @@
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -10,6 +11,7 @@ from app.core.config import setting
 from app.db.db_engine import engine
 from app.grpc_client import start_search_client, stop_search_client
 from app.kafka.messaging import start_producer, stop_producer
+from app.kafka.consumer import run_page_consumer
 
 _STATIC_DIR = Path(__file__).parent / "static"
 
@@ -19,7 +21,11 @@ async def lifespan(app: FastAPI):
     """Жизненный цикл приложения: на остановке закрывает движок БД."""
     await start_producer()
     await start_search_client()
+    consumer_task = asyncio.create_task(run_page_consumer())
     yield
+    consumer_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await consumer_task
     await stop_search_client()
     await stop_producer()
     await engine.dispose()
