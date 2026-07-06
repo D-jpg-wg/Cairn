@@ -8,7 +8,12 @@ from app.items import PageItem
 
 class RssSpider(XMLFeedSpider):
     name = "rss"
-    start_urls = ["https://habr.com/ru/rss/articles/"]
+    # TODO: список лент должен приезжать из подписок (main-api), а не из кода —
+    # решить на шаге расписания, вместе с тем, кто вообще запускает прогоны.
+    start_urls = [
+        "https://habr.com/ru/rss/hubs/python/articles/",
+        "https://habr.com/ru/rss/hubs/postgresql/articles/",
+    ]
     iterator = "iternodes"
     itertag = "item"
 
