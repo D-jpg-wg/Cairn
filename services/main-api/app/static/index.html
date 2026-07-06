@@ -96,6 +96,7 @@
     }
     .chip:hover { color: var(--text); }
     .chip.active { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; }
+    .chip.more { border-style: dashed; background: transparent; font-weight: 500; }
 
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 
@@ -359,7 +360,8 @@
     };
 
     const $ = (id) => document.getElementById(id);
-    let state = { q: "", tags: [], editing: null };
+    const TAG_LIMIT = 12;  // чипов в свёрнутой панели; хвост уходит под «ещё N»
+    let state = { q: "", tags: [], editing: null, allTags: [], tagsExpanded: false };
 
     // ---------- helpers ----------
     function show(view) {
@@ -427,12 +429,28 @@
     async function loadTags() {
       try {
         const res = await api("/tags");
-        const tags = res.ok ? await res.json() : [];
-        const bar = $("tagbar");
-        bar.innerHTML =
-          `<span class="chip ${state.tags.length === 0 ? "active" : ""}" data-tag="">Все</span>` +
-          tags.map((t) => `<span class="chip ${state.tags.includes(t.name) ? "active" : ""}" data-tag="${esc(t.name)}">#${esc(t.name)}</span>`).join("");
+        state.allTags = res.ok ? await res.json() : [];
+        renderTagbar();
       } catch {}
+    }
+
+    function renderTagbar() {
+      const all = state.allTags;
+      // /tags отдаёт по убыванию использования — топ показываем, хвост под «ещё».
+      let visible = state.tagsExpanded ? all : all.slice(0, TAG_LIMIT);
+      if (!state.tagsExpanded) {
+        // выбранный фильтр не должен исчезать из панели, даже если он из хвоста
+        const hiddenActive = all.slice(TAG_LIMIT).filter((t) => state.tags.includes(t.name));
+        visible = visible.concat(hiddenActive);
+      }
+      const hidden = all.length - visible.length;
+      const chip = (t) => `<span class="chip ${state.tags.includes(t.name) ? "active" : ""}" data-tag="${esc(t.name)}">#${esc(t.name)}</span>`;
+      $("tagbar").innerHTML =
+        `<span class="chip ${state.tags.length === 0 ? "active" : ""}" data-tag="">Все</span>` +
+        visible.map(chip).join("") +
+        (all.length > TAG_LIMIT
+          ? `<span class="chip more" data-action="toggle">${state.tagsExpanded ? "свернуть ▴" : `ещё ${hidden} ▾`}</span>`
+          : "");
     }
 
     async function loadEntries() {
@@ -678,6 +696,11 @@
     $("tagbar").addEventListener("click", (e) => {
       const chip = e.target.closest(".chip");
       if (!chip) return;
+      if (chip.dataset.action === "toggle") {
+        state.tagsExpanded = !state.tagsExpanded;
+        renderTagbar();
+        return;
+      }
       const name = chip.dataset.tag;
       if (!name) {
         state.tags = [];                       // «Все» — сброс
@@ -686,7 +709,7 @@
       } else {
         state.tags.push(name);                 // добавить
       }
-      loadTags();
+      renderTagbar();                          // без refetch: список тегов не менялся
       loadEntries();
     });
 

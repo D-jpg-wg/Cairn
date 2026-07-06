@@ -1,7 +1,7 @@
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select, or_
+from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
@@ -110,8 +110,12 @@ class EntryRepository:
         return entry
 
     async def get_tags(self, owner_id: UUID) -> list[Tag]:
-        """Уникальные теги, встречающиеся в записях владельца."""
+        """Теги из записей владельца, самые используемые первыми."""
         tags = await self.session.execute(
-            select(Tag).join(Tag.entries).where(Entry.owner_id == owner_id).distinct()
+            select(Tag)
+            .join(Tag.entries)
+            .where(Entry.owner_id == owner_id)
+            .group_by(Tag.id)
+            .order_by(func.count().desc(), Tag.name)
         )
         return list(tags.scalars().all())
