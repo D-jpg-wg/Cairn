@@ -15,3 +15,4 @@ class PageItem(scrapy.Item):
     summary = scrapy.Field()
     published_at = scrapy.Field()
     tags = scrapy.Field()
+    content = scrapy.Field()

@@ -1,3 +1,4 @@
+import scrapy
 from email.utils import parsedate_to_datetime
 from w3lib.url import url_query_cleaner
 from w3lib.html import remove_tags, replace_escape_chars, replace_entities
@@ -25,7 +26,7 @@ class RssSpider(XMLFeedSpider):
             which_ones=("\n", "\t", "\r"),
             replace_by=" ",
         ).strip()
-        yield PageItem(
+        item = PageItem(
             source_url=response.url,
             url=url_query_cleaner(node.xpath("link/text()").get(), ()),
             title=node.xpath("title/text()").get(),
@@ -33,3 +34,24 @@ class RssSpider(XMLFeedSpider):
             published_at=parsedate_to_datetime(pub).isoformat() if pub else None,
             tags=node.xpath("category/text()").getall()[:5],
         )
+
+        yield scrapy.Request(
+            item["url"],
+            callback=self.parse_article,
+            errback=self.on_article_failed,
+            cb_kwargs={"item": item},
+            dont_filter=True,
+        )
+
+    def parse_article(self, response, item):
+        parts = []
+        for block in response.css("#post-content-body").css("p, h2, h3, h4, li, pre"):
+            text = " ".join(" ".join(block.css("::text").getall()).split())
+            if text:
+                parts.append(text)
+        item["content"] = "\n\n".join(parts) or None
+        yield item
+
+    def on_article_failed(self, failure):
+        """Страница не отдалась (403, таймаут) — событие уходит хотя бы с тизером."""
+        yield failure.request.cb_kwargs["item"]

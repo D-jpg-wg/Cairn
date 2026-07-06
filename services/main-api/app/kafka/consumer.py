@@ -46,7 +46,7 @@ async def _handle_page(event: dict) -> None:
                     type=EntryType.ARTICLE,
                     status=EntryStatus.READY,
                     title=event["title"][:255],
-                    content=event["summary"],
+                    content=event.get("content") or event["summary"],
                     url=event["url"],
                 )
                 .on_conflict_do_nothing()
