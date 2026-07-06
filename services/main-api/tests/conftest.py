@@ -126,7 +126,10 @@ async def engine(pg_url):
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.execute(
-            text("TRUNCATE entries, tags, entry_tags RESTART IDENTITY CASCADE")
+            text(
+                "TRUNCATE entries, tags, entry_tags, subscriptions "
+                "RESTART IDENTITY CASCADE"
+            )
         )
     yield eng
     await eng.dispose()

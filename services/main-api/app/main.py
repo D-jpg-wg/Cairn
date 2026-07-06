@@ -6,7 +6,13 @@ from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import entries_router, health_router, me_router
+from app.api import (
+    entries_router,
+    feeds_router,
+    health_router,
+    me_router,
+    subscriptions_router,
+)
 from app.core.config import setting
 from app.db.db_engine import engine
 from app.grpc_client import start_search_client, stop_search_client
@@ -42,6 +48,10 @@ def create_app() -> FastAPI:
     app.include_router(entries_router, prefix="/api/v1/entries", tags=["entries"])
     app.include_router(health_router, prefix="/api/v1", tags=["health"])
     app.include_router(me_router, prefix="/api/v1", tags=["me"])
+    app.include_router(
+        subscriptions_router, prefix="/api/v1/subscriptions", tags=["subscriptions"]
+    )
+    app.include_router(feeds_router, prefix="/api/v1", tags=["feeds"])
 
     app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="static")
     return app

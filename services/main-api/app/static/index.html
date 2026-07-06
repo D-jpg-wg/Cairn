@@ -155,6 +155,13 @@
       font-size: 13.5px; word-break: break-all; text-align: center;
     }
     .bot-meta { color: var(--muted); font-size: 12px; text-align: center; margin-top: 8px; }
+    .subs-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 10px 12px; margin-bottom: 8px;
+      background: #0f1222; border: 1px solid var(--border); border-radius: 11px;
+      font-size: 13px; word-break: break-all;
+    }
+    .subs-empty { color: var(--muted); font-size: 13px; padding: 6px 2px 14px; }
     .modal {
       width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
       background: linear-gradient(180deg, var(--card), var(--card-2));
@@ -263,6 +270,9 @@
       <button class="btn icon" id="bot-btn" title="Привязать Telegram-бота">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
       </button>
+      <button class="btn icon" id="subs-btn" title="Подписки на ленты">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
+      </button>
       <div class="user-pill"><span class="dot"></span><span id="user-id"></span></div>
       <button class="btn icon danger" id="logout-btn" title="Выйти">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>
@@ -340,11 +350,34 @@
     </div>
   </div>
 
+  <!-- модалка подписок на ленты -->
+  <div class="overlay" id="subs-overlay">
+    <div class="modal">
+      <div class="detail-head">
+        <h3>Подписки на ленты</h3>
+        <button class="close-x" id="subs-close-x" title="Закрыть">✕</button>
+      </div>
+      <p class="bot-hint">Новые статьи из подписанных RSS-лент придут в Telegram одним дайджестом.</p>
+      <div id="subs-list"></div>
+      <form id="subs-form">
+        <div class="field">
+          <label for="f-feed-url">Ссылка на RSS-ленту</label>
+          <input id="f-feed-url" type="url" maxlength="2048" placeholder="https://habr.com/ru/rss/hubs/python/articles/" required />
+        </div>
+        <div class="form-err" id="subs-form-err"></div>
+        <div class="modal-actions">
+          <button type="submit" class="btn primary" id="subs-add-btn">Подписаться</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script>
     const AUTH_URL = "http://localhost:8000/";   // сервис авторизации
     const API = "/api/v1/entries";
+    const SUBS_API = "/api/v1/subscriptions";
 
     const TYPES = {
       note:    { label: "Заметка", needs: "content" },
@@ -381,19 +414,21 @@
       try { return new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" }); }
       catch { return ""; }
     }
-    async function api(path, opts = {}, _retried = false) {
-      const res = await fetch(API + path, { credentials: "same-origin", ...opts });
+    async function request(base, path, opts = {}, _retried = false) {
+      const res = await fetch(base + path, { credentials: "same-origin", ...opts });
       // Access-токен короткий: на 401 один раз пробуем молча обновить его через auth и повторить.
       if (res.status === 401 && !_retried) {
         const r = await fetch(AUTH_URL + "api/v1/auth/refresh", {
           method: "POST",
           credentials: "include",
         });
-        if (r.ok) return api(path, opts, true);
+        if (r.ok) return request(base, path, opts, true);
       }
       if (res.status === 401) { show("gate"); throw new Error("unauthorized"); }
       return res;
     }
+    const api = (path, opts, _retried) => request(API, path, opts, _retried);
+    const subsApi = (path, opts, _retried) => request(SUBS_API, path, opts, _retried);
 
     // ---------- render ----------
     function entryCard(e) {
@@ -686,6 +721,85 @@
       toast("Скопировано — вставь боту в Telegram");
     });
 
+    // ---------- подписки на ленты ----------
+    function subsRow(s) {
+      return `
+        <div class="subs-row" data-id="${s.id}">
+          <span>${esc(s.feed_url)}</span>
+          <button class="btn icon danger" data-sub-del="${s.id}" title="Отписаться">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+          </button>
+        </div>`;
+    }
+
+    async function loadSubscriptions() {
+      try {
+        const res = await subsApi("/");
+        const subs = res.ok ? await res.json() : [];
+        $("subs-list").innerHTML = subs.length
+          ? subs.map(subsRow).join("")
+          : `<div class="subs-empty">Пока нет подписок.</div>`;
+        $("subs-list").querySelectorAll("[data-sub-del]").forEach((b) =>
+          b.addEventListener("click", () => removeSubscription(b.dataset.subDel)));
+      } catch (e) {
+        if (e.message !== "unauthorized") toast("Не удалось загрузить подписки", true);
+      }
+    }
+
+    async function removeSubscription(id) {
+      if (!confirm("Отписаться от ленты?")) return;
+      try {
+        const res = await subsApi(`/${id}`, { method: "DELETE" });
+        if (res.ok) { toast("Отписались"); await loadSubscriptions(); }
+        else toast("Не удалось отписаться", true);
+      } catch (e) { if (e.message !== "unauthorized") toast("Ошибка сети", true); }
+    }
+
+    function subsFormError(msg) {
+      const el = $("subs-form-err");
+      el.textContent = msg;
+      el.className = "form-err show";
+    }
+
+    async function submitSubscription(ev) {
+      ev.preventDefault();
+      const feed_url = $("f-feed-url").value.trim();
+      if (!feed_url) return;
+      const btn = $("subs-add-btn");
+      btn.disabled = true;
+      try {
+        const res = await subsApi("/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ feed_url }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          const detail = Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail;
+          return subsFormError(detail || "Не удалось подписаться.");
+        }
+        $("f-feed-url").value = "";
+        $("subs-form-err").className = "form-err";
+        await loadSubscriptions();
+      } catch (e) {
+        if (e.message !== "unauthorized") subsFormError("Ошибка сети.");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function closeSubsModal() { $("subs-overlay").classList.remove("show"); }
+
+    $("subs-btn").addEventListener("click", async () => {
+      $("subs-form-err").className = "form-err";
+      $("f-feed-url").value = "";
+      $("subs-overlay").classList.add("show");
+      await loadSubscriptions();
+    });
+    $("subs-close-x").addEventListener("click", closeSubsModal);
+    $("subs-overlay").addEventListener("click", (e) => { if (e.target === $("subs-overlay")) closeSubsModal(); });
+    $("subs-form").addEventListener("submit", submitSubscription);
+
     $("logout-btn").addEventListener("click", async () => {
       if (es) es.close();        // закрыть SSE перед выходом
       // Выход на стороне auth: отзывает refresh в БД и чистит обе cookie.
@@ -719,7 +833,7 @@
       searchTimer = setTimeout(() => { state.q = e.target.value.trim(); loadEntries(); }, 280);
     });
 
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); closeDetail(); closeBotModal(); } });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); closeDetail(); closeBotModal(); closeSubsModal(); } });
 
     // ---------- init ----------
     (async function init() {

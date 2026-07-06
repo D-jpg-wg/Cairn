@@ -1,3 +1,4 @@
+import json
 import scrapy
 from email.utils import parsedate_to_datetime
 from w3lib.url import url_query_cleaner
@@ -9,14 +10,27 @@ from app.items import PageItem
 
 class RssSpider(XMLFeedSpider):
     name = "rss"
-    # TODO: список лент должен приезжать из подписок (main-api), а не из кода —
-    # решить на шаге расписания, вместе с тем, кто вообще запускает прогоны.
-    start_urls = [
-        "https://habr.com/ru/rss/hubs/python/articles/",
-        "https://habr.com/ru/rss/hubs/postgresql/articles/",
-    ]
     iterator = "iternodes"
     itertag = "item"
+
+    def start_requests(self):
+        """Список лент — не в коде, а у main-api: чей-то /feeds решает подписка,
+        не паук (парсер про юзеров не знает, database-per-service)."""
+        main_api_url = self.settings["MAIN_API_URL"]
+        yield scrapy.Request(
+            f"{main_api_url}/api/v1/feeds",
+            callback=self.parse_feeds,
+            errback=self.on_feeds_failed,
+            meta={"dont_cache": True},
+        )
+
+    def parse_feeds(self, response):
+        for feed_url in json.loads(response.text):
+            yield scrapy.Request(feed_url, callback=self.parse, dont_filter=True)
+
+    def on_feeds_failed(self, failure):
+        """main-api недоступен — прогон пустой, а не падает целиком."""
+        self.logger.error("Не удалось получить список лент: %r", failure.value)
 
     def parse_node(self, response, node):
         pub = node.xpath("pubDate/text()").get()

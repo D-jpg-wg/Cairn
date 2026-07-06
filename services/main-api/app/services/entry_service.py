@@ -42,6 +42,7 @@ class EntryService:
                 "id": str(entry.id),
                 "owner_id": str(entry.owner_id),
                 "type": entry.type.value,
+                "title": entry.title,
                 "url": entry.url,
             },
         )

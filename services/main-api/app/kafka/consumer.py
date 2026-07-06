@@ -79,6 +79,7 @@ async def _handle_page(event: dict) -> None:
                 "id": str(entry_id),
                 "owner_id": str(owner_id),
                 "type": EntryType.ARTICLE.value,
+                "title": event["title"][:255],
                 "url": event["url"],
             },
         )

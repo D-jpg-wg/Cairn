@@ -65,6 +65,7 @@ ITEM_PIPELINES = {
 }
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:29092")
 PAGE_PARSED_TOPIC = "page.parsed"
+MAIN_API_URL = os.getenv("MAIN_API_URL", "http://localhost:8001")
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
 # AUTOTHROTTLE_ENABLED = True

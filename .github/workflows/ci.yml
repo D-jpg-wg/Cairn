@@ -25,6 +25,9 @@ jobs:
             bot:
               - 'services/bot/**'
               - '.github/workflows/ci.yml'
+            parser:
+              - 'services/parser/**'
+              - '.github/workflows/ci.yml'
   lint:
     runs-on: ubuntu-latest
     steps:

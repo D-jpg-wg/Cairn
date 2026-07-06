@@ -1,5 +1,5 @@
-# Общий стек проекта: сервисы auth и main-api со своими БД (database-per-service).
-# По мере роста сюда добавятся bot, parser, kafka, redis и т.д.
+# Общий стек проекта: auth, main-api, bot, parser, search — каждый со своей БД
+# (database-per-service), плюс общая инфраструктура (kafka, redis).
 
 services:
   auth-db:
@@ -243,6 +243,19 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
     entrypoint: [ ]
     command: celery -A app.worker.celery_app beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+    restart: unless-stopped
+
+  parser:
+    build: ./services/parser
+    depends_on:
+      kafka:
+        condition: service_healthy
+      main-api:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092  # изнутри сети — внутренний listener
+      MAIN_API_URL: http://main-api:8000   # внутренний порт, 8001 — это проброс на хост
+      CRAWL_INTERVAL: ${PARSER_CRAWL_INTERVAL:-3600}
     restart: unless-stopped
 
 volumes:
