@@ -22,6 +22,9 @@ ENV PYTHONUNBUFFERED=1 \
 RUN useradd --create-home --uid 1000 appuser
 
 WORKDIR /code
+# WORKDIR создаёт каталог от root — appuser нужен свой, чтобы писать HTTPCACHE_DIR
+# (scrapy кладёт .scrapy/ прямо под /code при первом прогоне).
+RUN chown appuser:appuser /code
 
 COPY --from=builder --chown=appuser:appuser /code/.venv /code/.venv
 COPY --chown=appuser:appuser . .

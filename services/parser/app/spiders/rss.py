@@ -13,9 +13,12 @@ class RssSpider(XMLFeedSpider):
     iterator = "iternodes"
     itertag = "item"
 
-    def start_requests(self):
+    async def start(self):
         """Список лент — не в коде, а у main-api: чей-то /feeds решает подписка,
-        не паук (парсер про юзеров не знает, database-per-service)."""
+        не паук (парсер про юзеров не знает, database-per-service).
+
+        Scrapy >=2.13 зовёт именно start() (async-генератор), не start_requests() —
+        старый синхронный метод в этой версии библиотеки вообще не вызывается."""
         main_api_url = self.settings["MAIN_API_URL"]
         yield scrapy.Request(
             f"{main_api_url}/api/v1/feeds",
@@ -26,7 +29,10 @@ class RssSpider(XMLFeedSpider):
 
     def parse_feeds(self, response):
         for feed_url in json.loads(response.text):
-            yield scrapy.Request(feed_url, callback=self.parse, dont_filter=True)
+            # Без callback: Scrapy сам роутит на spider._parse — родной диспетчер
+            # XMLFeedSpider (итерация нод -> parse_node). Публичного alias'а
+            # parse у XMLFeedSpider в этой версии Scrapy больше нет.
+            yield scrapy.Request(feed_url, dont_filter=True)
 
     def on_feeds_failed(self, failure):
         """main-api недоступен — прогон пустой, а не падает целиком."""

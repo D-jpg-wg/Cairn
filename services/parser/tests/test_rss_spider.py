@@ -35,9 +35,9 @@ def make_spider() -> RssSpider:
 # ---------- start_requests / parse_feeds: лента приезжает из main-api ----------
 
 
-def test_start_requests_asks_main_api_for_feeds():
+async def test_start_requests_asks_main_api_for_feeds():
     spider = make_spider()
-    requests = list(spider.start_requests())
+    requests = [r async for r in spider.start()]
 
     assert len(requests) == 1
     req = requests[0]
@@ -55,7 +55,9 @@ def test_parse_feeds_yields_a_request_per_feed_url():
     requests = list(spider.parse_feeds(response))
 
     assert [r.url for r in requests] == urls
-    assert all(r.callback == spider.parse for r in requests)
+    # Без явного callback — Scrapy сам роутит на spider._parse (родной
+    # диспетчер XMLFeedSpider); публичного parse в этой версии нет.
+    assert all(r.callback is None for r in requests)
 
 
 def test_parse_feeds_empty_list_yields_nothing():
