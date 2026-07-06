@@ -9,7 +9,6 @@ import httpx
 
 from app import texts
 from app.handlers.common import ENTRIES_PATH, bearer
-from app.services.token_provider import TokenProvider
 
 router = Router()
 
@@ -32,17 +31,20 @@ async def catch_text(message: Message) -> None:
     await message.reply(texts.WHAT_TO_SAVE, reply_markup=KB)
 
 
-@router.callback_query(F.data.startswith("save:"))
+@router.callback_query(F.data == "save:cancel")
+async def on_cancel(callback: CallbackQuery) -> None:
+    """Отмена без флага auth: убрать клавиатуру можно и без привязки."""
+    await callback.message.delete()
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("save:"), flags={"auth": True})
 async def on_save(
     callback: CallbackQuery,
-    token_provider: TokenProvider,
+    access: str,
     main_http: httpx.AsyncClient,
 ) -> None:
     action = callback.data.removeprefix("save:")
-    if action == "cancel":
-        await callback.message.delete()
-        await callback.answer()
-        return
 
     source = callback.message.reply_to_message
     if source is None or source.text is None:
@@ -50,10 +52,6 @@ async def on_save(
         await callback.answer(texts.SOURCE_LOST, show_alert=True)
         return
     text = source.text.strip()
-
-    # from_user колбэка — тот, кто нажал кнопку;
-    # message.from_user здесь был бы сам бот
-    access = await token_provider.get_access(callback.from_user.id)
 
     if action == "link":
         payload = {"title": text[:255], "type": "link", "url": text}

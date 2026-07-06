@@ -5,19 +5,17 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from app.handlers.common import bearer
-from app.services.token_provider import TokenProvider
 
 
 router = Router()
 
 
-@router.message(Command("whoami"))
+@router.message(Command("whoami"), flags={"auth": True})
 async def whoami(
     message: Message,
-    token_provider: TokenProvider,
+    access: str,
     auth_http: httpx.AsyncClient,
 ) -> None:
-    access = await token_provider.get_access(message.from_user.id)
     resp = await auth_http.get("/api/v1/auth/me", headers=bearer(access))
     resp.raise_for_status()
     await message.answer(resp.json()["email"])

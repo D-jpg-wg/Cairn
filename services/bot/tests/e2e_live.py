@@ -15,11 +15,13 @@ import time
 import uuid
 
 import httpx
+from aiogram.dispatcher.event.handler import HandlerObject
 
 from app.core.config import setting
 from app.db.db_engine import async_session, engine
 from app.handlers.account import whoami
-from app.handlers.capture import catch_text, on_save
+from app.handlers.capture import catch_text, on_cancel, on_save
+from app.middlewares.auth import AuthMiddleware
 from app.services.notifier import run_notifier
 from app.handlers.entries import cmd_add, cmd_entries, cmd_note
 from app.handlers.start import cmd_start
@@ -117,6 +119,20 @@ class FakeBot:
         self.sent.append((chat_id, text))
 
 
+async def _next_handler(event, data):
+    """Следующее звено цепочки middleware: отдаёт access, как его видит хендлер."""
+    return data.get("access")
+
+
+def auth_data(provider: TokenProvider, tg_id: int) -> dict:
+    """data-словарь, каким его собирает aiogram для хендлера с flags={"auth": True}."""
+    return {
+        "handler": HandlerObject(callback=_next_handler, flags={"auth": True}),
+        "event_from_user": FakeUser(tg_id),
+        "token_provider": provider,
+    }
+
+
 async def cleanup() -> None:
     async with async_session() as session:
         await BotRepository(session).delete(TG_ID)
@@ -210,10 +226,10 @@ async def main() -> None:
         gone = await BotRepository(session).get_by_telegram_id(TG_ID)
     check("строка удалена из bot-db", gone is None)
 
-    print("== 8. хендлер /whoami без привязки -> NotLinkedError ==")
-    # После рефакторинга хендлеры не ловят NotLinkedError — её ловит errors-роутер
+    print("== 8. AuthMiddleware без привязки -> NotLinkedError ==")
+    # Токен теперь достаёт middleware; исключение из неё ловит errors-роутер
     try:
-        await whoami(FakeMessage(TG_ID), provider, bot_http)  # type: ignore[arg-type]
+        await AuthMiddleware()(_next_handler, None, auth_data(provider, TG_ID))
         check("NotLinkedError долетела", False, "исключения не было")
     except NotLinkedError:
         check("NotLinkedError долетела", True)
@@ -246,9 +262,11 @@ async def main() -> None:
         str(msg.answers),
     )
 
-    print("== 10. хендлер /whoami после привязки ==")
+    print("== 10. AuthMiddleware выдаёт access, /whoami отвечает ==")
+    access = await AuthMiddleware()(_next_handler, None, auth_data(provider, TG_ID))
+    check("middleware выдала access", bool(access))
     msg = FakeMessage(TG_ID)
-    await whoami(msg, provider, bot_http)  # type: ignore[arg-type]
+    await whoami(msg, access, bot_http)  # type: ignore[arg-type]
     check("отвечает email'ом", msg.answers == [email], str(msg.answers))
 
     main_http = httpx.AsyncClient(base_url=setting.main_api_url, timeout=10)
@@ -256,7 +274,7 @@ async def main() -> None:
     print("== 11. /entries у свежего юзера — пусто ==")
     msg = FakeMessage(TG_ID)
     try:
-        await cmd_entries(msg, provider, main_http)  # type: ignore[arg-type]
+        await cmd_entries(msg, access, main_http)  # type: ignore[arg-type]
         check(
             "«записей нет»", any("пока нет" in a for a in msg.answers), str(msg.answers)
         )
@@ -265,16 +283,16 @@ async def main() -> None:
 
     print("== 12. /add и /note: подсказки без аргументов ==")
     msg = FakeMessage(TG_ID)
-    await cmd_add(msg, FakeCommand(None), provider, main_http)  # type: ignore[arg-type]
+    await cmd_add(msg, FakeCommand(None), access, main_http)  # type: ignore[arg-type]
     check("подсказка /add", any("Так:" in a for a in msg.answers), str(msg.answers))
     msg = FakeMessage(TG_ID)
-    await cmd_note(msg, FakeCommand(None), provider, main_http)  # type: ignore[arg-type]
+    await cmd_note(msg, FakeCommand(None), access, main_http)  # type: ignore[arg-type]
     check("подсказка /note", any("Так:" in a for a in msg.answers), str(msg.answers))
 
     print("== 13. /add <url> создаёт запись ==")
     msg = FakeMessage(TG_ID)
     try:
-        await cmd_add(msg, FakeCommand("https://example.com/e2e"), provider, main_http)  # type: ignore[arg-type]
+        await cmd_add(msg, FakeCommand("https://example.com/e2e"), access, main_http)  # type: ignore[arg-type]
         check("«добавил»", any("Добавил" in a for a in msg.answers), str(msg.answers))
     except Exception as exc:  # noqa: BLE001
         check("«добавил»", False, f"хендлер упал: {type(exc).__name__}: {exc}")
@@ -282,7 +300,7 @@ async def main() -> None:
     print("== 14. /note <текст> создаёт заметку ==")
     msg = FakeMessage(TG_ID)
     try:
-        await cmd_note(msg, FakeCommand("мысль из e2e-прогона"), provider, main_http)  # type: ignore[arg-type]
+        await cmd_note(msg, FakeCommand("мысль из e2e-прогона"), access, main_http)  # type: ignore[arg-type]
         check("«записал»", any("Записал" in a for a in msg.answers), str(msg.answers))
     except Exception as exc:  # noqa: BLE001
         check("«записал»", False, f"хендлер упал: {type(exc).__name__}: {exc}")
@@ -290,7 +308,7 @@ async def main() -> None:
     print("== 15. /entries показывает обе записи ==")
     msg = FakeMessage(TG_ID)
     try:
-        await cmd_entries(msg, provider, main_http)  # type: ignore[arg-type]
+        await cmd_entries(msg, access, main_http)  # type: ignore[arg-type]
         text = "\n".join(msg.answers)
         check(
             "список с обеими записями",
@@ -330,6 +348,15 @@ async def main() -> None:
     )
 
     print("== 17. Kafka: непривязанный юзер — тишина ==")
+    # Дожидаемся хвоста: события тестов 13–14 лежали в топике, пока у группы
+    # bot-notifier не было консьюмера (compose-бот остановлен) — тест 16
+    # выходит по первому сообщению, остальной бэклог доезжает позже.
+    quiet_until = time.monotonic() + 3
+    while time.monotonic() < quiet_until:
+        n = len(fake_bot.sent)
+        await asyncio.sleep(1)
+        if len(fake_bot.sent) != n:
+            quiet_until = time.monotonic() + 3
     sent_before = len(fake_bot.sent)
     web2 = httpx.AsyncClient(base_url=setting.auth_url, timeout=5)
     email2 = f"e2e-nolink-{int(time.time())}@test.io"
@@ -373,7 +400,7 @@ async def main() -> None:
 
     print("== 19. колбэк save:note сохраняет заметку ==")
     cb = FakeCallback("save:note", TG_ID, src)
-    await on_save(cb, provider, main_http)  # type: ignore[arg-type]
+    await on_save(cb, access, main_http)  # type: ignore[arg-type]
     check(
         "сообщение отредактировано в «Сохранил»",
         "Сохранил ✅" in cb.message.edits,
@@ -383,11 +410,11 @@ async def main() -> None:
     print("== 20. колбэк save:link сохраняет ссылку ==")
     src2 = FakeMessageWithText(TG_ID, "https://example.com/capture-e2e")
     cb = FakeCallback("save:link", TG_ID, src2)
-    await on_save(cb, provider, main_http)  # type: ignore[arg-type]
+    await on_save(cb, access, main_http)  # type: ignore[arg-type]
     check("ссылка сохранена", "Сохранил ✅" in cb.message.edits, str(cb.message.edits))
 
     msg = FakeMessage(TG_ID)
-    await cmd_entries(msg, provider, main_http)  # type: ignore[arg-type]
+    await cmd_entries(msg, access, main_http)  # type: ignore[arg-type]
     text = "\n".join(msg.answers)
     check(
         "обе появились в /entries",
@@ -397,13 +424,12 @@ async def main() -> None:
 
     print("== 21. колбэк save:cancel удаляет вопрос ==")
     cb = FakeCallback("save:cancel", TG_ID, src)
-    await on_save(cb, provider, main_http)  # type: ignore[arg-type]
+    await on_cancel(cb)  # type: ignore[arg-type]
     check("сообщение с кнопками удалено", cb.message.deleted)
 
-    print("== 22. колбэк от непривязанного юзера -> NotLinkedError ==")
-    cb = FakeCallback("save:note", 111_222, FakeMessageWithText(111_222, "чужой текст"))
+    print("== 22. middleware для непривязанного юзера -> NotLinkedError ==")
     try:
-        await on_save(cb, provider, main_http)  # type: ignore[arg-type]
+        await AuthMiddleware()(_next_handler, None, auth_data(provider, 111_222))
         check("NotLinkedError долетела", False, "исключения не было")
     except NotLinkedError:
         check("NotLinkedError долетела", True)

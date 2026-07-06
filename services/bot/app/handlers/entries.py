@@ -5,11 +5,9 @@ import httpx
 
 from app import texts
 from app.handlers.common import ENTRIES_PATH, bearer
-from app.services.token_provider import TokenProvider
+from app.texts import STATUS_ICON
 
 router = Router()
-
-STATUS_ICON = {"pending": "⏳", "ready": "✅", "failed": "⚠️"}
 
 
 def _render(entries: list[dict]) -> str:
@@ -26,13 +24,12 @@ def _render(entries: list[dict]) -> str:
     return "\n".join(lines)
 
 
-@router.message(Command("entries"))
+@router.message(Command("entries"), flags={"auth": True})
 async def cmd_entries(
     message: Message,
-    token_provider: TokenProvider,
+    access: str,
     main_http: httpx.AsyncClient,
 ) -> None:
-    access = await token_provider.get_access(message.from_user.id)
     resp = await main_http.get(
         ENTRIES_PATH, params={"limit": 10}, headers=bearer(access)
     )
@@ -44,17 +41,16 @@ async def cmd_entries(
     await message.answer(_render(entries), disable_web_page_preview=True)
 
 
-@router.message(Command("find"))
+@router.message(Command("find"), flags={"auth": True})
 async def cmd_find(
     message: Message,
     command: CommandObject,
-    token_provider: TokenProvider,
+    access: str,
     main_http: httpx.AsyncClient,
 ) -> None:
     if command.args is None:
         await message.answer(texts.USAGE_FIND)
         return
-    access = await token_provider.get_access(message.from_user.id)
     resp = await main_http.get(
         ENTRIES_PATH,
         params={"q": command.args.strip(), "limit": 10},
@@ -68,17 +64,16 @@ async def cmd_find(
     await message.answer(_render(entries), disable_web_page_preview=True)
 
 
-@router.message(Command("add"))
+@router.message(Command("add"), flags={"auth": True})
 async def cmd_add(
     message: Message,
     command: CommandObject,
-    token_provider: TokenProvider,
+    access: str,
     main_http: httpx.AsyncClient,
 ) -> None:
     if command.args is None:
         await message.answer(texts.USAGE_ADD)
         return
-    access = await token_provider.get_access(message.from_user.id)
     url = command.args.strip()
     resp = await main_http.post(
         ENTRIES_PATH,
@@ -92,17 +87,16 @@ async def cmd_add(
     await message.answer(texts.ADDED_LINK)
 
 
-@router.message(Command("note"))
+@router.message(Command("note"), flags={"auth": True})
 async def cmd_note(
     message: Message,
     command: CommandObject,
-    token_provider: TokenProvider,
+    access: str,
     main_http: httpx.AsyncClient,
 ) -> None:
     if command.args is None:
         await message.answer(texts.USAGE_NOTE)
         return
-    access = await token_provider.get_access(message.from_user.id)
     text = command.args.strip()
     resp = await main_http.post(
         ENTRIES_PATH,

@@ -36,10 +36,10 @@ Celery — фон внутри сервиса, observability — как выгл
 | 00 | Подготовка: монорепо, окружение, pre-commit | ✅ готово |
 | 01 | Скелет: `auth` (JWT) + `main-api`, database-per-service | ✅ готово |
 | 02 | Асинхронность: Celery + Redis, Kafka, первый gRPC-вызов | ✅ готово |
-| 03 | Бот: Aiogram-сервис, REST к Main API + consumer Kafka | 🔜 следующая |
-| 04 | Парсинг: Scrapy по расписанию → Kafka | ⬜ |
+| 03 | Бот: Aiogram-сервис, REST к Main API + consumer Kafka | ✅ готово |
+| 04 | Парсинг: Scrapy по расписанию → Kafka | 🔜 следующая |
 | 05 | Наблюдаемость: логи, health-checks, Prometheus + Grafana | ⬜ |
-| 06 | CI/CD: сборка образов, push в registry | 🟡 частично (lint+test на PR) |
+| 06 | CI/CD: lint+test на PR, сборка образов, push в ghcr | ✅ готово |
 | 07 | Kubernetes: Helm, Ingress | ⬜ |
 | 08 | ML-сервис: инференс embeddings | ⬜ |
 
@@ -84,8 +84,8 @@ Cairn/
 │   ├── auth/         JWT, OAuth2 · своя БД (FastAPI)        ✅
 │   ├── main-api/     ядро, бизнес-логика, Celery, Kafka     ✅
 │   ├── search/       gRPC-сервис (заглушка под embeddings)  ✅
-│   ├── bot/          Telegram-бот (Aiogram)                 🔜 скелет
-│   └── parser/       парсинг по расписанию (Scrapy)         ⬜ скелет
+│   ├── bot/          Telegram-бот (Aiogram)                 ✅
+│   └── parser/       парсинг по расписанию (Scrapy)         🔜 следующий
 │       ├── pyproject.toml   зависимости ТОЛЬКО этого сервиса
 │       ├── app/             код
 │       ├── alembic/         миграции его БД (где нужна)

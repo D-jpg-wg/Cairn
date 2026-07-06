@@ -2,23 +2,21 @@
 
 Хендлеры зовём напрямую со стабами вместо aiogram-объектов — фильтры и DI
 здесь не проверяются (это территория интеграционного прогона), только логика.
-NotLinkedError хендлеры не ловят — она летит в errors.on_not_linked, поэтому
-для непривязанного юзера тесты ожидают исключение, а ответ юзеру проверяется
-отдельными тестами errors-хендлера.
+Access-токен хендлерам выдаёт AuthMiddleware, поэтому тесты передают готовую
+строку ACCESS; случай «привязки нет» проверяется в test_auth_middleware.py,
+а ответ юзеру на NotLinkedError — тестами errors-хендлера ниже.
 """
-
-import pytest
 
 from app import texts
 from app.handlers.account import whoami
-from app.handlers.capture import catch_text, on_save
+from app.handlers.capture import catch_text, on_cancel, on_save
 from app.handlers.entries import cmd_add, cmd_entries, cmd_find, cmd_note
 from app.handlers.errors import on_not_linked
 from app.handlers.start import cmd_start
-from app.services.token_provider import NotLinkedError
 from tests.conftest import FakeCallback, FakeCommand, FakeMessage
 
 TG_ID = 100
+ACCESS = "access-token"
 
 
 # --- /start ---
@@ -67,114 +65,87 @@ async def test_start_relink_survives_blocked_old_chat(provider, fake_auth):
 # --- /whoami ---
 
 
-async def test_whoami_unlinked(provider, auth_http):
-    with pytest.raises(NotLinkedError):
-        await whoami(FakeMessage(TG_ID), provider, auth_http)
-
-
-async def test_whoami_linked(provider, fake_auth, auth_http):
-    await provider.link(TG_ID, fake_auth.issue_code())
+async def test_whoami(auth_http):
     msg = FakeMessage(TG_ID)
-    await whoami(msg, provider, auth_http)
+    await whoami(msg, ACCESS, auth_http)
     assert msg.answers == ["user@test.io"]
 
 
 # --- entries-команды ---
 
 
-async def linked(provider, fake_auth) -> None:
-    await provider.link(TG_ID, fake_auth.issue_code())
-
-
-async def test_entries_empty(provider, fake_auth, main_http):
-    await linked(provider, fake_auth)
+async def test_entries_empty(main_http):
     msg = FakeMessage(TG_ID)
-    await cmd_entries(msg, provider, main_http)
+    await cmd_entries(msg, ACCESS, main_http)
     assert any("пока нет" in a for a in msg.answers)
 
 
-async def test_add_and_list(provider, fake_auth, main_http, fake_main):
-    await linked(provider, fake_auth)
-
+async def test_add_and_list(main_http, fake_main):
     msg = FakeMessage(TG_ID)
-    await cmd_add(msg, FakeCommand("https://example.com/x"), provider, main_http)
+    await cmd_add(msg, FakeCommand("https://example.com/x"), ACCESS, main_http)
     assert any("Добавил" in a for a in msg.answers)
     assert fake_main.entries[0]["url"] == "https://example.com/x"
 
     msg = FakeMessage(TG_ID)
-    await cmd_entries(msg, provider, main_http)
+    await cmd_entries(msg, ACCESS, main_http)
     assert "example.com/x" in "\n".join(msg.answers)
 
 
-async def test_note(provider, fake_auth, main_http, fake_main):
-    await linked(provider, fake_auth)
+async def test_note(main_http, fake_main):
     msg = FakeMessage(TG_ID)
-    await cmd_note(msg, FakeCommand("мысль"), provider, main_http)
+    await cmd_note(msg, FakeCommand("мысль"), ACCESS, main_http)
     assert any("Записал" in a for a in msg.answers)
     assert fake_main.entries[0]["content"] == "мысль"
 
 
-async def test_add_usage_hint(provider, main_http):
+async def test_add_usage_hint(main_http):
     msg = FakeMessage(TG_ID)
-    await cmd_add(msg, FakeCommand(None), provider, main_http)
+    await cmd_add(msg, FakeCommand(None), ACCESS, main_http)
     assert any("Так:" in a for a in msg.answers)
-
-
-async def test_entries_unlinked(provider, main_http):
-    with pytest.raises(NotLinkedError):
-        await cmd_entries(FakeMessage(TG_ID), provider, main_http)
 
 
 # --- /find ---
 
 
-async def test_find_usage_hint(provider, main_http):
+async def test_find_usage_hint(main_http):
     msg = FakeMessage(TG_ID)
-    await cmd_find(msg, FakeCommand(None), provider, main_http)
+    await cmd_find(msg, FakeCommand(None), ACCESS, main_http)
     assert any("Так:" in a for a in msg.answers)
 
 
-async def test_find_unlinked(provider, main_http):
-    with pytest.raises(NotLinkedError):
-        await cmd_find(FakeMessage(TG_ID), FakeCommand("kafka"), provider, main_http)
-
-
-async def test_find_filters_entries(provider, fake_auth, main_http):
-    await linked(provider, fake_auth)
+async def test_find_filters_entries(main_http):
     await cmd_note(
-        FakeMessage(TG_ID), FakeCommand("заметка про kafka"), provider, main_http
+        FakeMessage(TG_ID), FakeCommand("заметка про kafka"), ACCESS, main_http
     )
     await cmd_note(
-        FakeMessage(TG_ID), FakeCommand("заметка про grpc"), provider, main_http
+        FakeMessage(TG_ID), FakeCommand("заметка про grpc"), ACCESS, main_http
     )
 
     msg = FakeMessage(TG_ID)
-    await cmd_find(msg, FakeCommand("kafka"), provider, main_http)
+    await cmd_find(msg, FakeCommand("kafka"), ACCESS, main_http)
 
     text = "\n".join(msg.answers)
     assert "про kafka" in text
     assert "grpc" not in text  # главный assert: поиск, а не «показать всё»
 
 
-async def test_find_no_matches(provider, fake_auth, main_http):
-    await linked(provider, fake_auth)
+async def test_find_no_matches(main_http):
     await cmd_note(
-        FakeMessage(TG_ID), FakeCommand("заметка про kafka"), provider, main_http
+        FakeMessage(TG_ID), FakeCommand("заметка про kafka"), ACCESS, main_http
     )
 
     msg = FakeMessage(TG_ID)
-    await cmd_find(msg, FakeCommand("такого-нет"), provider, main_http)
+    await cmd_find(msg, FakeCommand("такого-нет"), ACCESS, main_http)
     assert any("не нашлось" in a for a in msg.answers)
 
 
-async def test_render_dedups_title_equal_url(provider, fake_auth, main_http):
+async def test_render_dedups_title_equal_url(main_http):
     """title == url (как делает /add) — ссылка в выводе не дублируется."""
-    await linked(provider, fake_auth)
     url = "https://example.com/dedup"
-    await cmd_add(FakeMessage(TG_ID), FakeCommand(url), provider, main_http)
+    await cmd_add(FakeMessage(TG_ID), FakeCommand(url), ACCESS, main_http)
 
     msg = FakeMessage(TG_ID)
-    await cmd_entries(msg, provider, main_http)
+    await cmd_entries(msg, ACCESS, main_http)
     assert "\n".join(msg.answers).count(url) == 1
 
 
@@ -187,37 +158,29 @@ async def test_catch_text_offers_buttons():
     assert any("Что сохранить" in a for a in msg.answers)
 
 
-async def test_save_note_callback(provider, fake_auth, main_http, fake_main):
-    await linked(provider, fake_auth)
+async def test_save_note_callback(main_http, fake_main):
     cb = FakeCallback("save:note", TG_ID, FakeMessage(TG_ID, "текст заметки"))
-    await on_save(cb, provider, main_http)
+    await on_save(cb, ACCESS, main_http)
     assert "Сохранил ✅" in cb.message.edits
     assert fake_main.entries[0]["content"] == "текст заметки"
 
 
-async def test_save_link_callback(provider, fake_auth, main_http, fake_main):
-    await linked(provider, fake_auth)
+async def test_save_link_callback(main_http, fake_main):
     cb = FakeCallback("save:link", TG_ID, FakeMessage(TG_ID, "https://e.com"))
-    await on_save(cb, provider, main_http)
+    await on_save(cb, ACCESS, main_http)
     assert fake_main.entries[0]["url"] == "https://e.com"
 
 
-async def test_save_cancel_deletes_prompt(provider, main_http):
+async def test_save_cancel_deletes_prompt():
     cb = FakeCallback("save:cancel", TG_ID, FakeMessage(TG_ID, "x"))
-    await on_save(cb, provider, main_http)
+    await on_cancel(cb)
     assert cb.message.deleted
 
 
-async def test_save_unlinked_raises(provider, main_http):
-    cb = FakeCallback("save:note", TG_ID, FakeMessage(TG_ID, "x"))
-    with pytest.raises(NotLinkedError):
-        await on_save(cb, provider, main_http)
-
-
-async def test_save_lost_source_alerts(provider, main_http):
+async def test_save_lost_source_alerts(main_http):
     """Telegram не отдал reply_to_message (старое сообщение) — алерт, не падение."""
     cb = FakeCallback("save:note", TG_ID, None)
-    await on_save(cb, provider, main_http)
+    await on_save(cb, ACCESS, main_http)
     assert any("потерялось" in a for a in cb.alerts)
 
 

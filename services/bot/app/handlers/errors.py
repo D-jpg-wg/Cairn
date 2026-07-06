@@ -12,7 +12,7 @@ router = Router()
 async def on_not_linked(event: ErrorEvent) -> None:
     """NotLinkedError из любого хендлера оседает здесь — одно место вместо шести.
 
-    Хендлеры зовут get_access без try/except; как exception handlers в FastAPI.
+    AuthMiddleware зовёт get_access без try/except; как exception handlers в FastAPI.
     """
     if event.update.message:
         await event.update.message.answer(texts.NOT_LINKED)
