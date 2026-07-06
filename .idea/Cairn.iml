@@ -11,7 +11,7 @@
       <excludeFolder url="file://$MODULE_DIR$/services/bot/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/services/parser/.venv" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.14 (Cairn)Parser" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.14 (Cairn) Main_app" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>
