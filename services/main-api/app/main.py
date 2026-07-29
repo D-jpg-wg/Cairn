@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 from fastapi.responses import ORJSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
         subscriptions_router, prefix="/api/v1/subscriptions", tags=["subscriptions"]
     )
     app.include_router(feeds_router, prefix="/api/v1", tags=["feeds"])
+    Instrumentator().instrument(app).expose(app)
 
     app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="static")
     return app

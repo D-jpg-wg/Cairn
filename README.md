@@ -2,8 +2,9 @@
 
 [![CI](https://github.com/D-jpg-wg/Cairn/actions/workflows/ci.yml/badge.svg)](https://github.com/D-jpg-wg/Cairn/actions/workflows/ci.yml)
 [![coverage: auth](https://img.shields.io/badge/coverage%20auth-93%25-brightgreen)](#покрытие-тестами)
-[![coverage: main-api](https://img.shields.io/badge/coverage%20main--api-86%25-green)](#покрытие-тестами)
-[![coverage: bot](https://img.shields.io/badge/coverage%20bot-78%25-yellowgreen)](#покрытие-тестами)
+[![coverage: main-api](https://img.shields.io/badge/coverage%20main--api-85%25-green)](#покрытие-тестами)
+[![coverage: bot](https://img.shields.io/badge/coverage%20bot-85%25-green)](#покрытие-тестами)
+[![coverage: parser](https://img.shields.io/badge/coverage%20parser-53%25-yellow)](#покрытие-тестами)
 [![Python 3.14](https://img.shields.io/badge/python-3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -37,8 +38,8 @@ Celery — фон внутри сервиса, observability — как выгл
 | 01 | Скелет: `auth` (JWT) + `main-api`, database-per-service | ✅ готово |
 | 02 | Асинхронность: Celery + Redis, Kafka, первый gRPC-вызов | ✅ готово |
 | 03 | Бот: Aiogram-сервис, REST к Main API + consumer Kafka | ✅ готово |
-| 04 | Парсинг: Scrapy по расписанию → Kafka | 🔜 следующая |
-| 05 | Наблюдаемость: логи, health-checks, Prometheus + Grafana | ⬜ |
+| 04 | Парсинг: Scrapy по расписанию → Kafka, подписки, дайджест | ✅ готово |
+| 05 | Наблюдаемость: логи, health-checks, Prometheus + Grafana | 🔄 в процессе — метрики main-api готовы, логи (Loki/ELK) следующим шагом |
 | 06 | CI/CD: lint+test на PR, сборка образов, push в ghcr | ✅ готово |
 | 07 | Kubernetes: Helm, Ingress | ⬜ |
 | 08 | ML-сервис: инференс embeddings | ⬜ |
@@ -85,7 +86,7 @@ Cairn/
 │   ├── main-api/     ядро, бизнес-логика, Celery, Kafka     ✅
 │   ├── search/       gRPC-сервис (заглушка под embeddings)  ✅
 │   ├── bot/          Telegram-бот (Aiogram)                 ✅
-│   └── parser/       парсинг по расписанию (Scrapy)         🔜 следующий
+│   └── parser/       парсинг по расписанию (Scrapy)         ✅
 │       ├── pyproject.toml   зависимости ТОЛЬКО этого сервиса
 │       ├── app/             код
 │       ├── alembic/         миграции его БД (где нужна)
@@ -93,7 +94,7 @@ Cairn/
 │       └── Dockerfile       как собрать его в образ
 │
 ├── proto/                 ОБЩЕЕ: gRPC-контракты между сервисами (buf)
-├── infra/                 ОБЩЕЕ: инфраструктурные конфиги
+├── infra/                 ОБЩЕЕ: инфраструктурные конфиги (нагрузка, Prometheus)
 ├── docker-compose.yml     ОБЩЕЕ: поднять весь стек локально разом
 ├── .pre-commit-config.yaml ОБЩЕЕ: линтер/форматтер ruff на весь репо
 └── .github/workflows/     ОБЩЕЕ: CI на каждый PR
@@ -145,6 +146,8 @@ docker compose up --build      # все сервисы + postgres / kafka / redi
 | `bot-db` | `localhost:5434` | Postgres сервиса bot |
 | `redis` | `localhost:6379` | брокер Celery + кэш |
 | `kafka` | `localhost:29092` с хоста, `kafka:9092` изнутри сети | шина событий |
+| `prometheus` | http://localhost:9090 | сбор метрик (см. [Наблюдаемость](#наблюдаемость)) |
+| `grafana` | http://localhost:3000 (admin/admin) | дашборды поверх метрик |
 
 Рядом с `main-api` поднимаются `main-api-worker` (Celery worker) и
 `main-api-beat` (Celery beat) из того же образа.
@@ -171,6 +174,39 @@ uv add "fastapi[standard]"             # добавить зависимость
 или удалять старый номер — нельзя. На каждый gRPC-вызов ставится deadline,
 обработчики идемпотентны (ретраи могут прислать вызов дважды).
 
+## Наблюдаемость
+
+Фаза 05 (в процессе): метрики `main-api` через Prometheus + Grafana готовы,
+логи (Loki/ELK) — следующий шаг.
+
+`main-api` инструментирован
+[`prometheus-fastapi-instrumentator`](https://github.com/trallnag/prometheus-fastapi-instrumentator):
+каждый HTTP-запрос считается (латентность, размер, статус) и отдаётся на
+`GET /metrics`. Роут регистрируется **до** `app.mount("/", StaticFiles(...))` в
+`create_app()` (`services/main-api/app/main.py`) — иначе его перехватила бы
+раздача статики, смонтированная на `/`.
+
+`prometheus` (конфиг — `infra/prometheus/prometheus.yml`) скрейпит
+`main-api:8000/metrics` изнутри compose-сети раз в 15 секунд; `grafana` ходит в
+Prometheus как в data source (`http://prometheus:9090`, тоже по имени сервиса)
+и строит дашборд поверх — RPS по хендлерам, p95-латентность
+(`histogram_quantile` по `http_request_duration_seconds_bucket`), error rate
+(`http_requests_total{status=~"5.."}`).
+
+```bash
+curl localhost:8001/metrics | head       # сырые метрики main-api
+```
+
+Прогон нагрузки, чтобы увидеть график живьём:
+
+```bash
+export LOAD_ACCESS=$(infra/load/get_token.sh)
+uvx locust -f infra/load/locustfile.py MainApi --headless -u 20 -r 5 -t 90s -H http://localhost:8001
+```
+
+Остальные сервисы (`auth`, `bot`, `search`, `parser`) метриками пока не
+инструментированы — только `main-api` как первый шаг фазы 05.
+
 ## Покрытие тестами
 
 Coverage считается per-service (у каждого сервиса свои тесты и своё окружение):
@@ -186,8 +222,9 @@ Codecov или аналог):
 | Сервис | Покрытие | Что не покрыто и почему |
 |--------|----------|------------------------|
 | `auth` | 93% | `google_oauth.py` (48%) — внешний OAuth-флоу, руками через браузер |
-| `main-api` | 86% | Kafka/gRPC-обвязка — живая шина, проверяется e2e |
-| `bot` | 78% | `main.py`, `notifier.py`, `config.py` — composition root и Kafka-консьюмер, покрываются только живым `tests/e2e_live.py` против compose-стека |
+| `main-api` | 85% | Kafka/gRPC-обвязка — живая шина, проверяется e2e |
+| `bot` | 85% | `main.py` (0%) — composition root, покрывается только живым `tests/e2e_live.py`; `notifier.py` (80%) — ветки ошибок Telegram API не покрыты юнитами |
+| `parser` | 53% | `settings.py`, `middlewares.py` — конфиг и неиспользуемые заготовки Scrapy-миддлварей без логики; сам паук (`spiders/rss.py`) и пайплайн — 100% |
 | `search` | — | заглушка, тестов нет |
 
 В CI тесты идут с `--cov` — процент виден в логах джобы `test` каждого сервиса.
