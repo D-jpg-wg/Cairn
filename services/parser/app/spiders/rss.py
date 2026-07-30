@@ -32,7 +32,7 @@ class RssSpider(XMLFeedSpider):
             # Без callback: Scrapy сам роутит на spider._parse — родной диспетчер
             # XMLFeedSpider (итерация нод -> parse_node). Публичного alias'а
             # parse у XMLFeedSpider в этой версии Scrapy больше нет.
-            yield scrapy.Request(feed_url, dont_filter=True)
+            yield scrapy.Request(feed_url, dont_filter=True, meta={"dont_cache": True})
 
     def on_feeds_failed(self, failure):
         """main-api недоступен — прогон пустой, а не падает целиком."""
