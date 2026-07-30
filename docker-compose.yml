@@ -60,6 +60,8 @@ services:
     depends_on:
       main-api:
         condition: service_healthy
+      auth:
+        condition: service_healthy
     restart: unless-stopped
 
   grafana:

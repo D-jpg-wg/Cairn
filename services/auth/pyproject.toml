@@ -10,6 +10,7 @@ dependencies = [
     "greenlet>=3.5.2",
     "httpx>=0.28.1",
     "itsdangerous>=2.2.0",
+    "prometheus-fastapi-instrumentator>=8.1.0",
     "pydantic-settings>=2.14.2",
     "pydantic[email]>=2.13.4",
     "pyjwt[crypto]>=2.13.0",

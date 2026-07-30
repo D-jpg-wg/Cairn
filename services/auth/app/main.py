@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -44,7 +45,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
     app.include_router(health_router, prefix="/api/v1", tags=["health"])
-
+    Instrumentator().instrument(app).expose(app)
     app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="static")
     return app
 
