@@ -4,20 +4,24 @@ from contextlib import suppress
 
 from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
+from prometheus_client import start_http_server
 
 from app import handlers
 from app.core.config import setting
 from app.db.db_engine import async_session, engine
 from app.services.notifier import run_notifier
 from app.services.token_provider import TokenProvider
-from app.middlewares import AuthMiddleware
+from app.middlewares import AuthMiddleware, MetricsMiddleware
 
 
 async def main() -> None:
     bot = Bot(token=setting.telegram_bot_token)
+    start_http_server(9100)
     dp = Dispatcher()
     dp.include_routers(handlers.router)
+    dp.message.middleware(MetricsMiddleware())
     dp.message.middleware(AuthMiddleware())
+    dp.callback_query.middleware(MetricsMiddleware())
     dp.callback_query.middleware(AuthMiddleware())
     http = httpx.AsyncClient(base_url=setting.auth_url, timeout=5)
     main_http = httpx.AsyncClient(base_url=setting.main_api_url, timeout=5)

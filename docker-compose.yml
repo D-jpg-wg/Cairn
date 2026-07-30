@@ -62,6 +62,8 @@ services:
         condition: service_healthy
       auth:
         condition: service_healthy
+      bot:
+        condition: service_started
     restart: unless-stopped
 
   grafana:
@@ -132,6 +134,8 @@ services:
       AUTH_URL: http://auth:8000
       MAIN_API_URL: http://main-api:8000   # внутренний порт, 8001 — это проброс на хост
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092  # изнутри сети — внутренний listener
+    ports:
+      - "9100:9100"
     restart: unless-stopped
 
   main-api:
